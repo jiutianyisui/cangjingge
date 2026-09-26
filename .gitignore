@@ -1,0 +1,9 @@
+node_modules/
+*.log
+.DS_Store
+Thumbs.db
+*.tmp
+*.tmp.*
+
+# 构建产物：本仓库**提交** lib/（使用者直接装就能跑，不必自己构建），
+# 所以这里不忽略它。若你改了 src/ 忘了重新 build，跑 npm run verify 会提醒。

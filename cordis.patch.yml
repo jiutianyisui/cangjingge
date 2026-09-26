@@ -1,0 +1,11 @@
+# dsh-cangjingge bundle patch：把本包自己那一行插件插进组合包。
+#
+# 与天枢同一模式：dsh 插件管理器读 package.json 的 dsh.bundle.patch，
+# 把这里的 patch 当作一个 profile 层应用。没有它，本包只是个普通依赖，
+# 安装时会报 "declares no dsh.bundle"。
+#
+# `name` 必须是包名，这样 node 才能顺着本包自己的 exports 解析到 lib/index.js；
+# 行 id 是用户在自己 profile 的 patch 里覆盖 / 禁用本插件时要对上的名字。
+- insert:
+    - id: dsh-cangjingge
+      name: dsh-cangjingge

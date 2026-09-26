@@ -1,0 +1,55 @@
+{
+  "name": "dsh-cangjingge",
+  "version": "0.1.0",
+  "description": "藏经阁 · skill 书架：三栏（分组 / 子项 / skill）浏览本地 skill 库，并把选中的 skill 通过输入触发菜单插入聊天框。",
+  "type": "module",
+  "main": "lib/index.js",
+  "exports": {
+    ".": {
+      "default": "./lib/index.js"
+    },
+    "./client": {
+      "default": "./lib/client.js"
+    },
+    "./package.json": "./package.json",
+    "./cordis.patch.yml": "./cordis.patch.yml"
+  },
+  "files": [
+    "lib/index.js",
+    "lib/library.js",
+    "lib/toolkit.js",
+    "lib/client.js",
+    "cordis.patch.yml",
+    "README.md",
+    "LICENSE"
+  ],
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/jiutianyisui/cangjingge.git"
+  },
+  "bugs": {
+    "url": "https://github.com/jiutianyisui/cangjingge/issues"
+  },
+  "homepage": "https://github.com/jiutianyisui/cangjingge#readme",
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    },
+    "client": {
+      "platform": "web"
+    }
+  },
+  "keywords": [
+    "dsh",
+    "dsh-plugin",
+    "skill",
+    "library",
+    "cangjingge"
+  ],
+  "scripts": {
+    "build": "node tools/build.mjs",
+    "test": "node tests/library.mjs && node tests/host.mjs && node tests/bundle.mjs && node tests/e2e.mjs",
+    "verify": "node tools/build.mjs && node tests/library.mjs && node tests/host.mjs && node tests/bundle.mjs && node tests/e2e.mjs"
+  }
+}
