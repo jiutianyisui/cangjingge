@@ -46,51 +46,118 @@ const CSS_ATTR = 'data-dsh-cangjingge-css'
 
 // ===========================================================================
 // 样式（类名统一 dsh-cjg-* 前缀，避免撞上 DSH 自己的类）
+//
+// 【视觉取向：暗金古卷】
+//   书架不是表单，第一眼要「像个有分量的东西」。所以：
+//   - 底：比 bg-base 再深一档的墨色，叠一层极淡的暖金径向光
+//   - 强调：暖金（--dsh-cjg-gold），只用在选中态、标题点、图标
+//   - 行：卡片化（圆角 + 透明边框），悬停浮起，选中带左侧竖条与光晕
+//   - 全部颜色走 CSS 变量，跟随 DSH 主题令牌，亮/暗主题都能用
+//
+// 为什么不用固定色值：DSH 有亮/暗两套主题，写死 #1a1a1a 在亮色主题上
+// 就是一块脏斑。变量一律取 --dsw-alias-*，只把「金色」这一个自有强调色
+// 写死（它在两套主题里都成立，且是本插件的识别色）。
 // ===========================================================================
 
 const CSS = [
-  '.dsh-cjg-root{display:flex;flex-direction:column;height:100%;min-height:0;background:var(--dsw-alias-bg-base);color:var(--dsw-alias-label-primary);font-size:13px;line-height:1.55}',
-  '.dsh-cjg-head{display:flex;align-items:center;gap:8px;padding:10px 14px;border-bottom:1px solid var(--dsw-alias-border-l1);flex:0 0 auto}',
-  '.dsh-cjg-title{font-weight:600;font-size:13px}',
-  '.dsh-cjg-sub{color:var(--dsw-alias-label-tertiary);font-size:11px}',
+  // ── 调色板与基础 ────────────────────────────────────────────────────────
+  ':root{--dsh-cjg-gold:#c9a227;--dsh-cjg-gold-soft:rgba(201,162,39,.14);--dsh-cjg-gold-line:rgba(201,162,39,.42)}',
+  '.dsh-cjg-root{position:relative;display:flex;flex-direction:column;height:100%;min-height:0;background:var(--dsw-alias-bg-base);color:var(--dsw-alias-label-primary);font-size:13px;line-height:1.55;overflow:hidden}',
+  // 顶部一层暖金径向光：极淡，只为打破纯色底，不抢内容
+  '.dsh-cjg-root::before{content:"";position:absolute;inset:0;pointer-events:none;background:radial-gradient(120% 62% at 50% -14%,var(--dsh-cjg-gold-soft),transparent 62%)}',
+
+  // ── 顶栏 ────────────────────────────────────────────────────────────────
+  '.dsh-cjg-head{position:relative;z-index:1;display:flex;align-items:center;gap:9px;padding:11px 14px;border-bottom:1px solid var(--dsw-alias-border-l1);flex:0 0 auto}',
+  '.dsh-cjg-brand{display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;flex:0 0 auto;border-radius:7px;background:linear-gradient(160deg,var(--dsh-cjg-gold-line),transparent 70%);color:var(--dsh-cjg-gold)}',
+  '.dsh-cjg-title{font-weight:600;font-size:13px;letter-spacing:.02em}',
+  '.dsh-cjg-sub{color:var(--dsw-alias-label-tertiary);font-size:10.5px;max-width:38vw;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;direction:rtl;text-align:left}',
   '.dsh-cjg-spacer{flex:1 1 auto}',
-  '.dsh-cjg-btn{border:1px solid var(--dsw-alias-border-l2);background:transparent;color:var(--dsw-alias-label-primary);border-radius:6px;padding:3px 9px;font-size:11px;cursor:pointer;font-family:inherit}',
-  '.dsh-cjg-btn:hover{background:var(--dsw-alias-bg-layer-2)}',
-  '.dsh-cjg-btn:disabled{opacity:.5;cursor:default}',
-  '.dsh-cjg-btn-primary{border-color:var(--dsw-alias-brand-primary);color:var(--dsw-alias-brand-primary)}',
-  // 三栏：左(分组) / 中(子项) / 右(skill)
-  '.dsh-cjg-cols{flex:1 1 auto;display:flex;min-height:0;min-width:0}',
+
+  // ── 按钮 ────────────────────────────────────────────────────────────────
+  '.dsh-cjg-btn{display:inline-flex;align-items:center;gap:4px;border:1px solid var(--dsw-alias-border-l2);background:transparent;color:var(--dsw-alias-label-primary);border-radius:8px;padding:4px 10px;font-size:11px;cursor:pointer;font-family:inherit;transition:background .14s,border-color .14s,transform .08s,color .14s}',
+  '.dsh-cjg-btn:hover{background:var(--dsw-alias-bg-layer-2);border-color:var(--dsh-cjg-gold-line)}',
+  '.dsh-cjg-btn:active{transform:translateY(1px)}',
+  '.dsh-cjg-btn:disabled{opacity:.45;cursor:default}',
+  // 主按钮：暖底 + 金边，文字仍用主标签色（对比度安全）
+  '.dsh-cjg-btn-primary{border-color:var(--dsh-cjg-gold-line);background:var(--dsh-cjg-gold-soft)}',
+  '.dsh-cjg-btn-primary:hover{background:var(--dsh-cjg-gold-soft);border-color:var(--dsh-cjg-gold)}',
+
+  // ── 三栏骨架 ────────────────────────────────────────────────────────────
+  '.dsh-cjg-cols{position:relative;z-index:1;flex:1 1 auto;display:flex;min-height:0;min-width:0;gap:0}',
   '.dsh-cjg-col{display:flex;flex-direction:column;min-height:0;min-width:0}',
-  '.dsh-cjg-col-l{flex:0 0 168px}',
-  '.dsh-cjg-col-m{flex:0 0 168px;border-left:1px solid var(--dsw-alias-border-l1)}',
-  '.dsh-cjg-col-r{flex:1 1 auto;border-left:1px solid var(--dsw-alias-border-l1)}',
-  '.dsh-cjg-col-head{flex:0 0 auto;display:flex;align-items:center;gap:4px;padding:7px 9px 5px;font-size:10px;text-transform:uppercase;letter-spacing:.06em;color:var(--dsw-alias-label-tertiary)}',
-  '.dsh-cjg-list{flex:1 1 auto;overflow-y:auto;padding:0 6px 10px;min-height:0}',
-  '.dsh-cjg-row{display:flex;align-items:center;gap:6px;width:100%;text-align:left;border:1px solid transparent;background:transparent;color:inherit;border-radius:7px;padding:4px 7px;margin-bottom:2px;cursor:pointer;font-family:inherit;font-size:12px;line-height:1.4}',
-  '.dsh-cjg-row:hover{background:var(--dsw-alias-bg-layer-1)}',
-  '.dsh-cjg-row-on{background:var(--dsw-alias-bg-layer-1);border-color:var(--dsw-alias-brand-primary)}',
+  // 栏宽用 clamp：窄窗口不至于挤成一条缝，宽窗口也不会空得发慌
+  '.dsh-cjg-col-l{flex:0 0 clamp(132px,17vw,178px)}',
+  // 分栏用「发丝线 + 微光」而不是整块边框：更像纸页折痕
+  '.dsh-cjg-col-m,.dsh-cjg-col-r{border-left:1px solid var(--dsw-alias-border-l1)}',
+  '.dsh-cjg-col-m{flex:0 0 clamp(132px,17vw,178px)}',
+  '.dsh-cjg-col-r{flex:1 1 auto}',
+  // 右栏的 skill 列表**不**占满剩余高度：它按内容自然高，上限为栏高的一半。
+  // 否则一两个 skill 时列表会把下面撑出一大段空白（详情被推到很下面）。
+  '.dsh-cjg-list-top{flex:0 1 auto;max-height:42%;min-height:0;overflow-y:auto;padding:0 8px 8px;border-bottom:1px solid var(--dsw-alias-border-l1)}',
+
+  // ── 栏头 ────────────────────────────────────────────────────────────────
+  // 中文不做 uppercase（text-transform 对汉字无效，但会把英文栏名拉成
+  // 全大写 + 大字距，中文栏名旁边就显得突兀）。统一按小号粗体处理。
+  '.dsh-cjg-col-head{flex:0 0 auto;display:flex;align-items:center;gap:5px;padding:9px 12px 6px;font-size:10px;font-weight:600;letter-spacing:.06em;color:var(--dsw-alias-label-tertiary)}',
+  '.dsh-cjg-count{font-weight:400;letter-spacing:0;opacity:.75}',
+
+  // ── 列表与行（卡片化）──────────────────────────────────────────────────
+  '.dsh-cjg-list{flex:1 1 auto;overflow-y:auto;padding:0 8px 12px;min-height:0}',
+  '.dsh-cjg-row{position:relative;display:flex;align-items:center;gap:7px;width:100%;text-align:left;border:1px solid transparent;background:transparent;color:inherit;border-radius:9px;padding:6px 9px;margin-bottom:3px;cursor:pointer;font-family:inherit;font-size:12px;line-height:1.4;transition:background .14s,border-color .14s,transform .1s,box-shadow .14s}',
+  '.dsh-cjg-row:hover{background:var(--dsw-alias-bg-layer-1);border-color:var(--dsw-alias-border-l1);transform:translateX(2px)}',
+  // 选中：左侧金色竖条 + 暖底 + 微光晕
+  '.dsh-cjg-row-on{background:linear-gradient(90deg,var(--dsh-cjg-gold-soft),transparent 86%);border-color:var(--dsh-cjg-gold-line);box-shadow:inset 0 0 0 1px rgba(201,162,39,.06)}',
+  '.dsh-cjg-row-on::before{content:"";position:absolute;left:0;top:20%;bottom:20%;width:2px;border-radius:2px;background:var(--dsh-cjg-gold);box-shadow:0 0 6px var(--dsh-cjg-gold-line)}',
+  // 选中行的名字**不加金色**：金色在亮色主题下对浅底对比度不足。
+  // 选中感由竖条 + 暖底 + 加粗承担，这在亮/暗两套主题里都稳。
+  // 图标才上金色 —— 它是图形，对比度容忍度高得多。
+  '.dsh-cjg-row-on .dsh-cjg-ico{color:var(--dsh-cjg-gold);opacity:1}',
+  '.dsh-cjg-row-on .dsh-cjg-row-name{font-weight:600}',
+  // 文件夹/文件图标
+  '.dsh-cjg-ico{flex:0 0 auto;display:inline-flex;align-items:center;justify-content:center;width:13px;height:13px;opacity:.62;transition:opacity .14s}',
+  '.dsh-cjg-row:hover .dsh-cjg-ico,.dsh-cjg-row-on .dsh-cjg-ico{opacity:1}',
   '.dsh-cjg-row-name{flex:1 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}',
-  '.dsh-cjg-row-count{flex:0 0 auto;font-size:10px;color:var(--dsw-alias-label-tertiary)}',
-  '.dsh-cjg-dot{flex:0 0 auto;width:6px;height:6px;border-radius:2px;background:var(--dsw-alias-brand-primary);opacity:.7}',
-  '.dsh-cjg-body{flex:1 1 auto;overflow:auto;padding:8px 10px 20px;min-height:0}',
-  '.dsh-cjg-empty{padding:24px 14px;text-align:center;color:var(--dsw-alias-label-tertiary);font-size:12px;line-height:1.7}',
-  '.dsh-cjg-err{margin:8px 2px;padding:8px 10px;border-radius:7px;font-size:11px;color:var(--dsw-alias-state-error-primary);border:1px solid var(--dsw-alias-state-error-primary);white-space:pre-wrap;word-break:break-word}',
+  '.dsh-cjg-count-chip{flex:0 0 auto;font-size:9.5px;min-width:15px;text-align:center;padding:1px 5px;border-radius:999px;background:var(--dsw-alias-bg-layer-2);color:var(--dsw-alias-label-tertiary)}',
+  '.dsh-cjg-row-on .dsh-cjg-count-chip{background:var(--dsh-cjg-gold-soft);color:var(--dsh-cjg-gold)}',
+
+  // ── 右栏正文区 ──────────────────────────────────────────────────────────
+  '.dsh-cjg-body{flex:1 1 auto;overflow:auto;padding:10px 14px 22px;min-height:0}',
+  '.dsh-cjg-empty{padding:26px 18px;text-align:center;color:var(--dsw-alias-label-tertiary);font-size:12px;line-height:1.85}',
+  '.dsh-cjg-empty-mark{display:block;font-size:22px;line-height:1;margin-bottom:8px;opacity:.35}',
+  '.dsh-cjg-err{margin:8px 2px;padding:9px 11px;border-radius:9px;font-size:11px;color:var(--dsw-alias-state-error-primary);border:1px solid var(--dsw-alias-state-error-primary);background:var(--dsw-alias-bg-layer-1);white-space:pre-wrap;word-break:break-word}',
   '.dsh-cjg-note{margin:8px 2px;font-size:11px;color:var(--dsw-alias-label-tertiary);white-space:pre-wrap;word-break:break-word}',
-  '.dsh-cjg-skill-head{display:flex;align-items:center;gap:7px;flex-wrap:wrap;margin-bottom:7px}',
-  '.dsh-cjg-skill-name{font-weight:600;font-size:13px;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}',
-  '.dsh-cjg-path{font-family:var(--dsw-specific-font-family-code),monospace;font-size:10px;color:var(--dsw-alias-label-tertiary);word-break:break-all;margin-bottom:8px}',
-  '.dsh-cjg-pre{margin:0;padding:8px 10px;border-radius:6px;overflow:auto;background:var(--dsw-alias-bg-layer-2);font-family:var(--dsw-specific-font-family-code),monospace;font-size:11px;white-space:pre-wrap;word-break:break-word;max-height:52vh}',
-  '.dsh-cjg-actions{margin-top:9px;display:flex;gap:6px;flex-wrap:wrap;align-items:center}',
-  '.dsh-cjg-hint{margin-top:8px;font-size:11px;color:var(--dsw-alias-label-tertiary);line-height:1.6}',
-  '.dsh-cjg-icon{display:inline-flex;align-items:center;justify-content:center}',
-  '.dsh-cjg-icon-active{color:var(--dsw-alias-brand-primary)}',
-  '.dsh-cjg-modal-mask{position:fixed;inset:0;z-index:50;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,.35)}',
-  '.dsh-cjg-modal{width:min(380px,88vw);padding:14px 16px;border-radius:10px;background:var(--dsw-alias-bg-overlay,#1c1c1f);border:1px solid var(--dsw-alias-border-l2);box-shadow:0 12px 32px rgba(0,0,0,.35)}',
+
+  // ── skill 详情 ──────────────────────────────────────────────────────────
+  '.dsh-cjg-skill-head{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:4px}',
+  '.dsh-cjg-skill-name{font-weight:600;font-size:14px;letter-spacing:.01em;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}',
+  '.dsh-cjg-path{font-family:var(--dsw-specific-font-family-code),monospace;font-size:10px;color:var(--dsw-alias-label-tertiary);word-break:break-all;margin-bottom:10px;opacity:.85}',
+  // 正文用「纸」的观感：微内阴影 + 稍暖的底，跟前后的 UI 拉开层次
+  '.dsh-cjg-paper{position:relative;margin-top:10px;padding:12px 14px;border-radius:10px;background:var(--dsw-alias-bg-layer-2);border:1px solid var(--dsw-alias-border-l1);box-shadow:inset 0 1px 0 rgba(255,255,255,.03)}',
+  '.dsh-cjg-paper::before{content:"";position:absolute;left:0;top:12px;bottom:12px;width:2px;border-radius:2px;background:var(--dsh-cjg-gold-line);opacity:.5}',
+  '.dsh-cjg-pre{margin:0;overflow:auto;background:transparent;font-family:var(--dsw-specific-font-family-code),monospace;font-size:11.5px;line-height:1.7;white-space:pre-wrap;word-break:break-word;max-height:52vh}',
+  '.dsh-cjg-actions{margin-top:11px;display:flex;gap:7px;flex-wrap:wrap;align-items:center}',
+  '.dsh-cjg-hint{margin-top:11px;padding:8px 11px;border-radius:9px;font-size:11px;color:var(--dsw-alias-label-secondary);background:var(--dsw-alias-bg-layer-1);border:1px dashed var(--dsh-cjg-gold-line);line-height:1.65}',
+  '.dsh-cjg-kbd{display:inline-block;padding:0 5px;border-radius:5px;font-family:var(--dsw-specific-font-family-code),monospace;font-size:10.5px;color:var(--dsh-cjg-gold);border:1px solid var(--dsh-cjg-gold-line);background:var(--dsh-cjg-gold-soft)}',
+
+  // ── 图标 ────────────────────────────────────────────────────────────────
+  '.dsh-cjg-icon{display:inline-flex;align-items:center;justify-content:center;transition:transform .16s}',
+  '.dsh-cjg-icon-active{color:var(--dsh-cjg-gold)}',
+
+  // ── 浮层（保留）─────────────────────────────────────────────────────────
+  '.dsh-cjg-modal-mask{position:fixed;inset:0;z-index:50;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,.42)}',
+  '.dsh-cjg-modal{width:min(380px,88vw);padding:14px 16px;border-radius:12px;background:var(--dsw-alias-bg-overlay,#1c1c1f);border:1px solid var(--dsw-alias-border-l2);box-shadow:0 18px 44px rgba(0,0,0,.42)}',
   '.dsh-cjg-modal-title{font-weight:600;font-size:13px;margin-bottom:8px}',
-  '.dsh-cjg-input{display:block;width:100%;box-sizing:border-box;padding:5px 8px;font-size:12px;font-family:inherit;color:var(--dsw-alias-label-primary);background:var(--dsw-alias-bg-layer-1);border:1px solid var(--dsw-alias-border-l2);border-radius:6px;outline:none;margin-bottom:10px}',
-  '.dsh-cjg-input:focus{border-color:var(--dsw-alias-brand-primary)}',
+  '.dsh-cjg-input{display:block;width:100%;box-sizing:border-box;padding:5px 8px;font-size:12px;font-family:inherit;color:var(--dsw-alias-label-primary);background:var(--dsw-alias-bg-layer-1);border:1px solid var(--dsw-alias-border-l2);border-radius:8px;outline:none;margin-bottom:10px}',
+  '.dsh-cjg-input:focus{border-color:var(--dsh-cjg-gold-line)}',
   '.dsh-cjg-modal-actions{display:flex;gap:6px;margin-top:4px}',
+
+  // ── 滚动条：细、暗、悬停才显眼 ──────────────────────────────────────────
+  '.dsh-cjg-list::-webkit-scrollbar,.dsh-cjg-list-top::-webkit-scrollbar,.dsh-cjg-body::-webkit-scrollbar,.dsh-cjg-pre::-webkit-scrollbar{width:7px;height:7px}',
+  '.dsh-cjg-list::-webkit-scrollbar-thumb,.dsh-cjg-list-top::-webkit-scrollbar-thumb,.dsh-cjg-body::-webkit-scrollbar-thumb,.dsh-cjg-pre::-webkit-scrollbar-thumb{background:var(--dsw-alias-border-l2);border-radius:999px}',
+  '.dsh-cjg-list::-webkit-scrollbar-thumb:hover,.dsh-cjg-list-top::-webkit-scrollbar-thumb:hover,.dsh-cjg-body::-webkit-scrollbar-thumb:hover,.dsh-cjg-pre::-webkit-scrollbar-thumb:hover{background:var(--dsh-cjg-gold-line)}',
+  '.dsh-cjg-list::-webkit-scrollbar-track,.dsh-cjg-list-top::-webkit-scrollbar-track,.dsh-cjg-body::-webkit-scrollbar-track,.dsh-cjg-pre::-webkit-scrollbar-track{background:transparent}',
 ].join('')
+
 
 /**
  * 样式安装器：把 CSS 挂进 <head>，返回卸载函数。
@@ -210,20 +277,61 @@ function PanelIcon(props) {
 }
 
 /**
+ * 行内小图标：文件夹（线框）。
+ *
+ * 用 stroke 而非 fill：在 13px 这个尺寸上，填充的文件夹会糊成一团。
+ * 颜色交给 CSS（currentColor + opacity），这样悬停/选中态能一起变。
+ * @param props - { size }。
+ * @returns React 元素。
+ */
+function FolderGlyph(props) {
+  const size = typeof props.size === 'number' ? props.size : 13
+  return React.createElement('svg', {
+    viewBox: '0 0 16 16', width: size, height: size, 'aria-hidden': 'true', focusable: 'false',
+    fill: 'none', stroke: 'currentColor', strokeWidth: 1.3,
+    strokeLinejoin: 'round', strokeLinecap: 'round',
+  }, React.createElement('path', {
+    d: 'M1.6 3.6 h4.2 l1.3 1.7 h7.3 v6.9 a.8.8 0 0 1 -.8.8 h-11.2 a.8.8 0 0 1 -.8-.8 z',
+  }))
+}
+
+/**
+ * 行内小图标：skill 文件（线框，带折角）。
+ * @param props - { size }。
+ * @returns React 元素。
+ */
+function FileGlyph(props) {
+  const size = typeof props.size === 'number' ? props.size : 13
+  return React.createElement('svg', {
+    viewBox: '0 0 16 16', width: size, height: size, 'aria-hidden': 'true', focusable: 'false',
+    fill: 'none', stroke: 'currentColor', strokeWidth: 1.3,
+    strokeLinejoin: 'round', strokeLinecap: 'round',
+  }, [
+    React.createElement('path', { key: 'p', d: 'M3.4 1.9 h5.6 l3.6 3.6 v8.6 a.8.8 0 0 1 -.8.8 h-8.4 a.8.8 0 0 1 -.8-.8 z' }),
+    React.createElement('path', { key: 'f', d: 'M9 1.9 v3.6 h3.6' }),
+  ])
+}
+
+/**
  * 一栏的列表。
- * @param props - { title, entries, active, onPick, emptyText }。
+ * @param props - { title, kind, entries, active, onPick, emptyText }。
  * @returns React 元素。
  */
 function Column(props) {
   const entries = Array.isArray(props.entries) ? props.entries : []
+  const Glyph = props.kind === 'skill' ? FileGlyph : FolderGlyph
   const children = []
   children.push(React.createElement('div', { key: 'h', className: 'dsh-cjg-col-head' },
     React.createElement('span', null, props.title),
     React.createElement('span', { className: 'dsh-cjg-spacer' }),
-    React.createElement('span', null, entries.length > 0 ? String(entries.length) : '')))
+    entries.length > 0
+      ? React.createElement('span', { className: 'dsh-cjg-count' }, String(entries.length))
+      : null))
 
   if (entries.length === 0) {
-    children.push(React.createElement('div', { key: 'e', className: 'dsh-cjg-empty' }, props.emptyText))
+    children.push(React.createElement('div', { key: 'e', className: 'dsh-cjg-empty' },
+      React.createElement('span', { className: 'dsh-cjg-empty-mark' }, '∘'),
+      props.emptyText))
   } else {
     for (const entry of entries) {
       const on = props.active === entry.name
@@ -234,9 +342,11 @@ function Column(props) {
         title: entry.name,
         onClick: () => props.onPick(entry.name),
       },
-      React.createElement('span', { className: 'dsh-cjg-dot' }),
+      React.createElement('span', { className: 'dsh-cjg-ico' }, React.createElement(Glyph, null)),
       React.createElement('span', { className: 'dsh-cjg-row-name' }, entry.name),
-      entry.count === undefined ? null : React.createElement('span', { className: 'dsh-cjg-row-count' }, String(entry.count))))
+      entry.count === undefined
+        ? null
+        : React.createElement('span', { className: 'dsh-cjg-count-chip' }, String(entry.count))))
     }
   }
   return React.createElement('div', { className: 'dsh-cjg-col ' + props.className },
@@ -256,7 +366,10 @@ function Column(props) {
 function SkillDetail(props) {
   if (props.skill === null || props.skill === undefined) {
     return React.createElement('div', { className: 'dsh-cjg-empty' },
-      '左栏选中一个分组、中栏选中一个子项，这里会列出里面的 skill。')
+      React.createElement('span', { className: 'dsh-cjg-empty-mark' }, '藏'),
+      '从左栏选一个分组、中栏选一个子项，',
+      React.createElement('br'),
+      '这里会列出里面的 skill。')
   }
   if (props.loading === true) {
     return React.createElement('div', { className: 'dsh-cjg-empty' }, '读取中……')
@@ -266,6 +379,8 @@ function SkillDetail(props) {
   }
   return React.createElement('div', null,
     React.createElement('div', { className: 'dsh-cjg-skill-head' },
+      React.createElement('span', { className: 'dsh-cjg-ico', style: { opacity: 1, color: 'var(--dsh-cjg-gold)' } },
+        React.createElement(FileGlyph, { size: 15 })),
       React.createElement('span', { className: 'dsh-cjg-skill-name' }, props.skill.name)),
     React.createElement('div', { className: 'dsh-cjg-path' }, props.skill.path),
     React.createElement('div', { className: 'dsh-cjg-actions' },
@@ -276,16 +391,19 @@ function SkillDetail(props) {
       }, '复制路径'),
       React.createElement('button', {
         type: 'button',
-        className: 'dsh-cjg-btn',
+        className: 'dsh-cjg-btn dsh-cjg-btn-primary',
         onClick: () => props.onCopy(String(props.text === undefined || props.text === null ? '' : props.text)),
       }, '复制全文')),
     React.createElement('div', { className: 'dsh-cjg-hint' },
-      '在聊天输入框里打 “/” 打开菜单，选「藏经阁」，即可把 skill 插入当前对话框。'),
+      '在聊天输入框里打 ',
+      React.createElement('span', { className: 'dsh-cjg-kbd' }, '/'),
+      '　打开菜单 → 选「藏经阁」→ 挑这个 skill，即可插入当前对话。'),
     props.truncated === true
       ? React.createElement('div', { className: 'dsh-cjg-note' }, '（文件较大，正文已截断显示）')
       : null,
-    React.createElement('pre', { className: 'dsh-cjg-pre' },
-      String(props.text === undefined || props.text === null || props.text === '' ? '(空文件)' : props.text)))
+    React.createElement('div', { className: 'dsh-cjg-paper' },
+      React.createElement('pre', { className: 'dsh-cjg-pre' },
+        String(props.text === undefined || props.text === null || props.text === '' ? '(空文件)' : props.text))))
 }
 
 /**
@@ -405,8 +523,9 @@ function ShelfPanel() {
 
   return React.createElement('div', { className: 'dsh-cjg-root' },
     React.createElement('div', { className: 'dsh-cjg-head' },
-      React.createElement('span', { className: 'dsh-cjg-title' }, '藏经阁 · skill 书架'),
-      React.createElement('span', { className: 'dsh-cjg-sub' }, rootText),
+      React.createElement('span', { className: 'dsh-cjg-brand' }, React.createElement(PanelIcon, { size: 14 })),
+      React.createElement('span', { className: 'dsh-cjg-title' }, '藏经阁'),
+      React.createElement('span', { className: 'dsh-cjg-sub', title: rootText }, rootText),
       React.createElement('span', { className: 'dsh-cjg-spacer' }),
       React.createElement('button', {
         type: 'button', className: 'dsh-cjg-btn',
@@ -419,13 +538,13 @@ function ShelfPanel() {
         ? React.createElement('div', { className: 'dsh-cjg-err' }, state.error)
         : React.createElement('div', { className: 'dsh-cjg-cols' },
           React.createElement(Column, {
-            title: '分组', className: 'dsh-cjg-col-l',
+            title: '分组', kind: 'group', className: 'dsh-cjg-col-l',
             entries: groups, active: selection.group,
             onPick: pickGroup,
             emptyText: '藏经阁里还没有分组文件夹。在根目录下建一个文件夹，里面再建子文件夹放 skill。',
           }),
           React.createElement(Column, {
-            title: '子项', className: 'dsh-cjg-col-m',
+            title: '子项', kind: 'item', className: 'dsh-cjg-col-m',
             entries: items, active: selection.item,
             onPick: pickItem,
             emptyText: '这个分组下还没有子文件夹。',
@@ -434,18 +553,26 @@ function ShelfPanel() {
             React.createElement('div', { className: 'dsh-cjg-col-head' },
               React.createElement('span', null, 'skill'),
               React.createElement('span', { className: 'dsh-cjg-spacer' }),
-              React.createElement('span', null, skills.length > 0 ? String(skills.length) : '')),
-            React.createElement('div', { className: 'dsh-cjg-list' },
+              skills.length > 0
+                ? React.createElement('span', { className: 'dsh-cjg-count' }, String(skills.length))
+                : null),
+            React.createElement('div', { className: 'dsh-cjg-list-top' },
               skills.length === 0
-                ? React.createElement('div', { className: 'dsh-cjg-empty' }, '这个子项下还没有 skill 文件（支持 .md / .markdown / .txt）。')
-                : skills.map((skill) => React.createElement('button', {
-                  key: skill.path,
-                  type: 'button',
-                  className: 'dsh-cjg-row' + (detail.skill !== null && detail.skill !== undefined && detail.skill.path === skill.path ? ' dsh-cjg-row-on' : ''),
-                  title: skill.name,
-                  onClick: () => { void openSkill(skill) },
-                },
-                React.createElement('span', { className: 'dsh-cjg-row-name' }, skill.name)))),
+                ? React.createElement('div', { className: 'dsh-cjg-empty' },
+                  React.createElement('span', { className: 'dsh-cjg-empty-mark' }, '∘'),
+                  '这个子项下还没有 skill 文件（支持 .md / .markdown / .txt）。')
+                : skills.map((skill) => {
+                  const on = detail.skill !== null && detail.skill !== undefined && detail.skill.path === skill.path
+                  return React.createElement('button', {
+                    key: skill.path,
+                    type: 'button',
+                    className: 'dsh-cjg-row' + (on ? ' dsh-cjg-row-on' : ''),
+                    title: skill.name,
+                    onClick: () => { void openSkill(skill) },
+                  },
+                  React.createElement('span', { className: 'dsh-cjg-ico' }, React.createElement(FileGlyph, null)),
+                  React.createElement('span', { className: 'dsh-cjg-row-name' }, skill.name))
+                })),
             React.createElement('div', { className: 'dsh-cjg-body' },
               flash === null ? null : React.createElement('div', {
                 className: flash.kind === 'error' ? 'dsh-cjg-err' : 'dsh-cjg-note',
@@ -607,7 +734,7 @@ function apply(ctx) {
 
 exports.apply = apply
 exports.inject = ['slots']
-exports.__view = { ShelfPanel, PanelIcon, Column, SkillDetail }
+exports.__view = { ShelfPanel, PanelIcon, Column, SkillDetail, FolderGlyph, FileGlyph }
 exports.__const = {
   CSS, ICON_SLOT, MAIN_SLOT, PANEL_ID, SOURCE_TRIGGER, SOURCE_NAME,
   SHELF_URL, SKILL_URL,
