@@ -38,6 +38,7 @@ const ctx = {
   logger: { info() {}, warn() {} },
   effect(fn) { fn(); return () => {} },
   webServer: { register(spec) { routes.push(spec); return () => {} } },
+  systemPrompt: { section() { return () => {} } },
 }
 host.apply(ctx, { libraryDir: root })
 

@@ -31,7 +31,7 @@ function eq(actual, expected, label) {
 
 // ---- 形状 ---------------------------------------------------------------------
 eq(host.name, 'dsh-cangjingge', '插件名与 patch id 一致')
-eq(host.inject, ['webServer'], 'inject 是 [webServer]')
+eq(host.inject, ['webServer', 'systemPrompt'], 'inject 含 webServer 与 systemPrompt')
 ok(host.Config !== undefined && host.Config['~standard'] !== undefined, 'Config 有 ~standard')
 eq(typeof host.Config['~standard'].validate, 'function', 'Config 可 validate')
 
@@ -53,6 +53,8 @@ eq(typeof host.Config['~standard'].validate, 'function', 'Config 可 validate')
 
 // ---- 装载：路由注册 -----------------------------------------------------------
 const routes = []
+/** 收集注册进来的 systemPrompt section（验证「自动」注入）。 */
+const sections = []
 function makeCtx() {
   return {
     logger: { info() {}, warn() {} },
@@ -60,6 +62,12 @@ function makeCtx() {
     webServer: {
       register(spec) {
         routes.push(spec)
+        return () => {}
+      },
+    },
+    systemPrompt: {
+      section(spec) {
+        sections.push(spec)
         return () => {}
       },
     },
@@ -265,6 +273,53 @@ const skillC = join(root, '兵法', '谋', 'c.md')
   // 缺 path -> ok:false
   const r = await callPost('/cangjingge/mode', '/cangjingge/mode', JSON.stringify({ mode: 'auto' }))
   eq(r.json.ok, false, '缺 path 返回 ok=false')
+}
+
+// ---- 自动注入（systemPrompt.section）------------------------------------------
+{
+  // 装载时应当注册了一个 section
+  eq(sections.length, 1, '注册了一个 systemPrompt section')
+  const s = sections[0]
+  eq(s.name, 'cangjingge:auto', 'section 名正确')
+  eq(typeof s.order, 'number', 'section order 是数字')
+  ok(s.order > 600 && s.order < 800, 'order 落在 TEAM_POLICY(600) 与 PTC_ONLY(800) 之间')
+  eq(typeof s.text, 'function', 'text 是函数（动态注入的关键）')
+  // text() 必须是同步的：返回 Promise 会被渲染成 "[object Promise]"
+  eq(typeof s.text().then, 'undefined', 'text() 返回非 Promise（必须同步）')
+}
+
+// 注入内容的**正确性**用独立的 ctx 单独装一次来验（不受前面 TTL 缓存干扰）。
+// 注意 mode 测试结尾把 skillA 设回了 manual，所以这里重新设为 auto。
+{
+  await callPost('/cangjingge/mode', '/cangjingge/mode', JSON.stringify({ path: skillA, mode: 'auto' }))
+  const s2 = []
+  const ctx2 = {
+    logger: { info() {}, warn() {} },
+    effect(fn) { fn(); return () => {} },
+    webServer: { register() { return () => {} } },
+    systemPrompt: { section(spec) { s2.push(spec); return () => {} } },
+  }
+  host.apply(ctx2, { libraryDir: root })
+  eq(s2.length, 1, '第二次装载也注册 section')
+  // TTL 缓存是 per-apply 的，新 ctx 是新的闭包 —— 立刻就能拿到最新状态
+  const text = s2[0].text()
+  ok(text.includes('a.md'), '注入文本含自动 skill 的文件名')
+  ok(text.includes('a 正文'), '注入文本含自动 skill 的正文')
+  ok(text.includes('自动'), '注入文本带说明标记')
+}
+
+{
+  // 全部取消自动 -> 注入文本变回空串（新 ctx 绕开缓存）
+  await callPost('/cangjingge/mode', '/cangjingge/mode', JSON.stringify({ path: skillA, mode: 'manual' }))
+  const s3 = []
+  const ctx3 = {
+    logger: { info() {}, warn() {} },
+    effect(fn) { fn(); return () => {} },
+    webServer: { register() { return () => {} } },
+    systemPrompt: { section(spec) { s3.push(spec); return () => {} } },
+  }
+  host.apply(ctx3, { libraryDir: root })
+  eq(s3[0].text(), '', '取消自动后注入文本为空串')
 }
 
 // ---- 清理 ---------------------------------------------------------------------

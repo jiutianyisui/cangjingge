@@ -18,6 +18,9 @@ import {
   modeOf,
   withMode,
   autoSkills,
+  stripFrontmatter,
+  buildAutoSectionText,
+  AUTO_INJECT_MAX_CHARS,
   STATE_FILE_NAME,
   MODE_AUTO,
   MODE_MANUAL,
@@ -193,6 +196,36 @@ eq(normalizeState({ skills: [] }).skills, {}, 'skills 是数组 -> 空')
   // 坏条目不该混进自动清单
   const s = normalizeState({ skills: { '/a.md': 'auto', '/z.md': 'nonsense' } })
   eq(autoSkills(s), ['/a.md'], '坏条目不进自动清单')
+}
+
+// ---- 注入文本构建（buildAutoSectionText / stripFrontmatter）-------------------
+{
+  const withFm = '---\ndescription: "x"\nkind: "package-reference"\n---\n\n# 正文标题\n内容\n'
+  eq(stripFrontmatter(withFm).trim(), '# 正文标题\n内容', 'stripFrontmatter 剥掉首部 frontmatter')
+  eq(stripFrontmatter('# 直接开始\n'), '# 直接开始\n', '无 frontmatter 原样返回')
+  const midSep = '# 标题\n\n---\n\n后面内容\n'
+  eq(stripFrontmatter(midSep), midSep, '正文中间的分隔线不误伤')
+  eq(stripFrontmatter(null), '', 'null -> 空串')
+}
+
+{
+  eq(buildAutoSectionText([]), '', '空清单 -> 空串')
+  eq(buildAutoSectionText(null), '', 'null -> 空串')
+
+  const text = buildAutoSectionText([
+    { name: '规则.md', path: '/a/规则.md', text: '---\nkind: x\n---\n\n第一条规则' },
+    { name: '空.md', path: '/a/空.md', text: '   ' },
+  ])
+  ok(text.includes('规则.md'), '含文件名标题')
+  ok(text.includes('第一条规则'), '含正文')
+  ok(!text.includes('kind: x'), 'frontmatter 已剥离')
+  ok(!text.includes('空.md'), '空正文的条目不出现')
+
+  const long = buildAutoSectionText([
+    { name: 'long.md', path: '/a/long.md', text: 'x'.repeat(AUTO_INJECT_MAX_CHARS + 500) },
+  ])
+  ok(long.includes('已截断'), '超长正文被截断并标记')
+  ok(long.length < AUTO_INJECT_MAX_CHARS + 400, '截断后长度受控')
 }
 
 // ---- 结果 ---------------------------------------------------------------------

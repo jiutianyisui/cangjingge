@@ -5,6 +5,7 @@
 //   1. 读取配置里的「藏经阁根目录」（默认 ~/.dsh/cangjingge）
 //   2. 扫描磁盘 -> 三栏书架树
 //   3. 通过 HTTP 路由把树 / 单个 skill 正文给浏览器半
+//   4. **把标记为「自动」的 skill 正文注入系统提示**（systemPrompt.section）
 //
 // 本插件**零 @deepseek-ai 依赖**（理由见天枢 src\toolkit.js 头注释：
 // 声明 @deepseek-ai/* 会顶掉桌面端自带运行时 -> 整个软件打不开）。
@@ -12,9 +13,21 @@
 //
 // 【静态组合包拿不到 host.call】浏览器半访问宿主数据只能走宿主自注册的
 // HTTP 路由（webServer.register，官方扩展点）。与天枢同一条路。
+//
+// 【「自动」是怎么做到"一直遵守"的】
+//   不是发便条，而是注册一个**动态的**系统提示 section：
+//     ctx.systemPrompt.section({ name, order, text: () => 现读清单 })
+//   已对 0.1.7-rc.2 的 dsh-system-prompt 核实：它会做
+//     text: typeof section.text === "function" ? section.text(context) : section.text
+//   也就是**每次组装系统提示时都调用那个函数**。所以：
+//     * 用户改开关 -> 下一次组装自然读到新状态，不需要重建 section
+//     * 每轮都在（这就是"一直遵守"）
+//   注册在**根作用域**，对所有会话可见（section() 的文档：注册到调用上下文的作用域）。
 // ---------------------------------------------------------------------------
 
 import { readdir, readFile, stat, writeFile } from 'node:fs/promises'
+// 同步读只在「自动注入」那条路上用（systemPrompt 的组装是同步的，见下方注释）
+import { readFileSync } from 'node:fs'
 import { homedir } from 'node:os'
 import { join, resolve, sep } from 'node:path'
 import {
@@ -28,6 +41,7 @@ import {
   modeOf,
   withMode,
   autoSkills,
+  buildAutoSectionText,
 } from './library.js'
 
 import { defineConfig } from './toolkit.js'
@@ -38,11 +52,15 @@ export const name = 'dsh-cangjingge'
 /**
  * 依赖的服务。
  * - webServer：注册浏览器半读取书架用的 HTTP 路由。
+ * - systemPrompt：「自动」skill 的常驻注入（动态 section）。
  *
- * 注意这里**没有** tools：藏经阁不注册模型工具（它不是给模型用的，
- * 是给人点着看的）。将来若要让模型也能列书，再加。
+ * 【必须声明 systemPrompt】cordis 是依赖注入框架：不声明依赖，apply 可能在
+ * 服务就绪前跑完，那时 ctx.systemPrompt 是 undefined，注入静默失败。
+ * （藏经阁踩过一次同类坑：客户端 inject 漏了 inputTriggers，`/` 菜单不出现。）
+ *
+ * 注意这里**没有** tools：藏经阁不注册模型工具。
  */
-export const inject = ['webServer']
+export const inject = ['webServer', 'systemPrompt']
 
 /** 默认藏经阁根目录（用户可在设置或 patch 里覆盖）。 */
 export function defaultLibraryDir() {
@@ -242,8 +260,86 @@ export function apply(ctx, config) {
   const rootDir = resolveLibraryDir(settings.libraryDir)
   ctx.logger?.info?.('dsh-cangjingge: library dir = ' + rootDir)
 
+  // -------------------------------------------------------------------------
+  // 「自动」skill 的常驻注入（动态 systemPrompt section）
+  //
+  // 【必须是同步的】dsh-system-prompt 的组装是**同步**过程：
+  //     text: typeof section.text === "function" ? section.text(context) : section.text
+  //   —— 直接取返回值，不 await。传 async 函数会得到一个 Promise 被当成
+  //   文本渲染（变成 "[object Promise]"），或者干脆报错。
+  //   所以这一路**用同步 fs**（readFileSync / readdirSync），不用 promise 版。
+  //
+  // 【为什么缓存】系统提示每轮都组装，而读状态 + N 个文件是同步 IO，
+  //   会阻塞。用户开关一小时才改一次，却要为每轮付一次读盘。所以加短 TTL
+  //   缓存（默认 5 秒）：开关改动能很快生效，又不至于每轮打盘。
+  // -------------------------------------------------------------------------
+  const AUTO_CACHE_MS = 5000
+  /** { at: number, text: string } —— 上次构建结果与时刻。 */
+  let autoCache = { at: 0, text: '' }
+
   /**
-   * 把一个对象作为 JSON 写回浏览器。
+   * 同步读 skill 正文（注入路径专用）。
+   * 与异步 readSkill 有同样的根目录内校验 —— 自动清单里的路径也可能被
+   * 手工改坏，不能因为"是内部的"就跳过检查。
+   * @param targetPath - 待读路径。
+   * @returns 文本或 null（读不到）。
+   */
+  function readSkillSync(targetPath) {
+    try {
+      const root = resolve(rootDir)
+      const full = resolve(String(targetPath))
+      if (full !== root && !full.startsWith(root + sep)) return null
+      const buffer = readFileSync(full)
+      const truncated = buffer.length > SKILL_MAX_BYTES
+      return (truncated ? buffer.slice(0, SKILL_MAX_BYTES) : buffer).toString('utf8')
+    } catch {
+      return null
+    }
+  }
+
+  /**
+   * 构建「自动」skill 的注入文本（同步 + 短 TTL 缓存）。
+   *
+   * 空清单返回空串 —— renderPrompt 会把空 section 过滤掉，等于这一节不存在。
+   * 所以"取消全部自动"就是这一节自然消失，不需要注销注册。
+   *
+   * @returns 注入文本（可能为空串）。
+   */
+  function autoSectionText() {
+    const now = Date.now()
+    if (now - autoCache.at < AUTO_CACHE_MS) return autoCache.text
+
+    let text = ''
+    try {
+      const raw = readFileSync(join(rootDir, STATE_FILE_NAME), 'utf8')
+      const state = normalizeState(JSON.parse(raw))
+      const items = []
+      for (const path of autoSkills(state)) {
+        const body = readSkillSync(path)
+        if (body === null) {
+          // 读不到（文件被删/改名）就跳过并留一条日志 —— 静默消失最难查
+          ctx.logger?.warn?.('dsh-cangjingge: 自动 skill 读取失败（已跳过）：' + path)
+          continue
+        }
+        const name = String(path).split(/[\\/]/).pop() || '(未命名)'
+        items.push({ name, path, text: body })
+      }
+      text = buildAutoSectionText(items)
+    } catch (error) {
+      // 状态文件不存在（还没点过自动）会走到这里 —— 那是**正常**情况，不是错误。
+      // 真正异常也只记日志：这个函数每轮都被调用，抛出去会把会话卡死。
+      const code = error !== null && error !== undefined ? error.code : undefined
+      if (code !== 'ENOENT') {
+        ctx.logger?.warn?.('dsh-cangjingge: 自动注入构建失败：' + String(error && error.message ? error.message : error))
+      }
+      text = ''
+    }
+    autoCache = { at: now, text }
+    return text
+  }
+
+  /**
+   * 把对象作为 JSON 写回浏览器（HTTP 路由用）。
    * @param res - HTTP 响应。
    * @param status - 状态码。
    * @param value - 待序列化值。
@@ -467,4 +563,23 @@ export function apply(ctx, config) {
       }
     },
   }), 'dsh-cangjingge: candidates route')
+
+  // -------------------------------------------------------------------------
+  // 「自动」清单 -> 常驻系统提示
+  //
+  // 【这是「自动」开关真正生效的地方】
+  //   text 传**函数**，dsh-system-prompt 每次组装提示时都会调用它
+  //   （已核实：text: typeof section.text === "function" ? section.text(context) : section.text）。
+  //   所以用户点开关后，**下一次组装**就反映新状态，不需要重建 section。
+  //
+  // 【order 取 700】SECTION_ORDERS 里 TEAM_POLICY = 600、PTC_ONLY = 800。
+  //   我们的工作区规则应排在团队策略之后、其余工具说明之前 —— 700 正好。
+  //
+  // 【空文本】返回空串会被 renderPrompt 的 filter 掉，等于没有这一节。
+  //   所以"取消全部自动"= 这一节自然消失，不需要注销注册。
+  ctx.effect(() => ctx.systemPrompt.section({
+    name: 'cangjingge:auto',
+    order: 700,
+    text: () => autoSectionText(),
+  }), 'dsh-cangjingge: auto sections')
 }

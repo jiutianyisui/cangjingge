@@ -273,7 +273,12 @@ export function withMode(state, path, mode) {
 }
 
 /**
- * 列出所有处于「自动」的 skill 路径。给 Lead 用：会话开头读这些。
+ * 列出所有处于「自动」的 skill 路径。
+ *
+ * 语义（已升级）：这些 skill 的正文会被**注入到系统提示**（宿主半用
+ * `systemPrompt.section()` 注册一个动态 section，每次组装时现读本清单）。
+ * 所以它们在**每个会话、每一轮**都在 —— 而不是"Lead 有空才去读"。
+ *
  * @param state - normalizeState 的产物。
  * @returns 路径数组（升序）。
  */
@@ -282,4 +287,50 @@ export function autoSkills(state) {
   return Object.keys(base.skills)
     .filter((key) => base.skills[key] === MODE_AUTO)
     .sort()
+}
+
+/** 单条自动 skill 注入系统提示时的字符上限（超出截断并加标记）。 */
+export const AUTO_INJECT_MAX_CHARS = 6000
+
+/**
+ * 剥离 markdown 的 YAML frontmatter（`---` 开头那段）。
+ *
+ * 【为什么剥】frontmatter 是给工具看的元数据（description / kind 之类），
+ * 对模型没有价值，白占 token。正文才是约束。
+ *
+ * @param text - 原始 md 文本。
+ * @returns 剥掉 frontmatter 后的正文。
+ */
+export function stripFrontmatter(text) {
+  const raw = typeof text === 'string' ? text : ''
+  // 只在文件开头（可有 BOM / 空白）才是 frontmatter，避免误伤正文里的分隔线
+  const match = /^\uFEFF?\s*---\r?\n([\s\S]*?)\r?\n---\r?\n?/.exec(raw)
+  if (match === null) return raw
+  return raw.slice(match[0].length)
+}
+
+/**
+ * 把若干个「自动」skill 的正文拼成一段注入文本。
+ *
+ * 空清单返回空串（调用方据此跳过注册 —— 一个空 section 没有意义，
+ * 还会白白触发 system-prompt/change）。
+ *
+ * @param items - [{ name, path, text }]（text 可能为 null 表示读不到）。
+ * @returns 注入文本（可能为空串）。
+ */
+export function buildAutoSectionText(items) {
+  const list = Array.isArray(items) ? items : []
+  const parts = []
+  for (const item of list) {
+    if (item === null || typeof item !== 'object') continue
+    const name = typeof item.name === 'string' && item.name.length > 0 ? item.name : '(未命名)'
+    const body = stripFrontmatter(typeof item.text === 'string' ? item.text : '').trim()
+    if (body.length === 0) continue
+    const clipped = body.length > AUTO_INJECT_MAX_CHARS
+      ? body.slice(0, AUTO_INJECT_MAX_CHARS) + '\n\n（正文过长，已截断）'
+      : body
+    parts.push('## ' + name + '\n\n' + clipped)
+  }
+  if (parts.length === 0) return ''
+  return '以下是本工作区标记为「自动」的 skill（每轮常驻，请遵守）：\n\n' + parts.join('\n\n---\n\n')
 }
