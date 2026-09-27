@@ -231,10 +231,14 @@ const skillC = join(root, '兵法', '谋', 'c.md')
   eq(a.mode, undefined, 'skill 不再带 mode 字段')
   eq(r.json.auto, undefined, 'shelf 不再回传 auto 清单')
   eq(a.visible, false, '默认不在 / 菜单显示')
-  // 分组统计：整组的 total / visibleCount 都要有，供界面与 /candidates 第一屏用
+  // 分组统计：整组的 total / visibleCount 都要有，供界面显示勾选情况用
   const g = r.json.groups.find((x) => x.name === '易经')
   ok(g !== undefined && g.total >= 2, '分组统计含 total')
   eq(g.visibleCount, 0, '默认没有可见项')
+  // 【关键回归】groups 里必须带 items —— 浏览器半的 candidates() 靠它遍历子项，
+  // 去掉会让 `/` 菜单永远为空（遍历不进循环），而书架面板照常，极难归因。
+  ok(Array.isArray(g.items) && g.items.length > 0, 'groups 里带 items（/ 菜单遍历的入口）')
+  eq(g.items.some((i) => i.name === '乾'), true, 'items 含子项名')
 }
 
 // ---- `/` 菜单可见性（POST /cangjingge/visible）--------------------------------
@@ -261,9 +265,29 @@ const skillC = join(root, '兵法', '谋', 'c.md')
   const paths = r.json.view.skills.map((x) => x.path)
   eq(paths.includes(skillA), true, '已勾选的出现在候选里')
   eq(paths.length, 1, '未勾选的不出现在候选里')
-  // 第一屏（空 query）用的分组统计
+  // 分组统计：客户端显示勾选情况用
   const g = r.json.groups.find((x) => x.name === '易经')
   eq(g.visibleCount, 1, '分组可见计数正确')
+}
+
+{
+  // 【关键回归】复现浏览器半 candidates() 的**完整遍历**：
+  //   fetchShelf(null) -> groups[].items[] -> 逐子项 fetchShelf(g, i)
+  // 这条链任一环断了（比如 groups 丢了 items），`/` 菜单就永远为空。
+  const top = await callRoute('/cangjingge/shelf', '/cangjingge/shelf')
+  const groups = top.json.groups
+  ok(Array.isArray(groups) && groups.length > 0, '顶层 groups 非空')
+
+  const rows = []
+  for (const g2 of groups) {
+    const items2 = Array.isArray(g2.items) ? g2.items : []
+    for (const i2 of items2) {
+      const one = await callRoute('/cangjingge/candidates', '/cangjingge/candidates?group=' + encodeURIComponent(g2.name) + '&item=' + encodeURIComponent(i2.name))
+      for (const s of one.json.view.skills) rows.push(s.path)
+    }
+  }
+  ok(rows.includes(skillA), '走通整条链后能拿到已勾选的 a.md')
+  eq(rows.length, 1, '未勾选的不混进来')
 }
 
 {

@@ -395,8 +395,10 @@ export function apply(ctx, config) {
         const group = queryParam(req, 'group')
         const item = queryParam(req, 'item')
         const view = shelfView(tree, { group, item })
-        // 给每个 skill 附上「是否在 `/` 菜单显示」；并给出整棵树的勾选统计，
-        // 供界面显示「本组有几个可插入」以及 /candidates 的第一屏用。
+        // 给每个 skill 附上「是否在 `/` 菜单显示」；分组统计里带上 items，
+        // 因为浏览器半的 candidates() 要遍历 group.items 才能逐子项取 skill。
+        // 【踩过的坑】曾把 items 从 groups 里去掉，只留扁平统计 —— `/` 菜单
+        //   于是永远为空（遍历不进循环），而书架面板照常，症状极具误导性。
         const skills = Array.isArray(view.skills)
           ? view.skills.map((s) => ({ ...s, visible: isVisible(state, s.path) }))
           : []
@@ -409,7 +411,13 @@ export function apply(ctx, config) {
               if (isVisible(state, s.path)) visibleCount += 1
             }
           }
-          return { name: g.name, count: g.items.length, total, visibleCount }
+          return {
+            name: g.name,
+            count: g.items.length,
+            total,
+            visibleCount,
+            items: g.items.map((i) => ({ name: i.name, count: i.skills.length })),
+          }
         })
         sendJson(res, 200, {
           ok: true,

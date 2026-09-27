@@ -952,8 +952,8 @@ function makeSource(rootCtx) {
      *   两段式，但输入触发菜单没有二级下钻，体验反而绕。现在直接列全部已勾选项
      *   —— 数量由书架的「在 / 菜单显示」开关控制住。
      *
-     * 【只列已勾选的】宿主侧 /cangjingge/candidates 已按 _visible.json 过滤，
-     *   这里拿到的就是可用的。
+     * 【只列已勾选的】宿主侧 /cangjingge/shelf 返回**全部** skill 并给每条附上
+     *   `visible` 字段，所以过滤在这里做（见下面的 `if (skill.visible !== true)`）。
      * @param session - { sessionId }。
      * @param req - { query, signal }。
      * @returns 候选行数组。
@@ -976,6 +976,10 @@ function makeSource(rootCtx) {
           const view = one.view !== null && one.view !== undefined ? one.view : null
           const skills = view !== null && Array.isArray(view.skills) ? view.skills : []
           for (const skill of skills) {
+            // 【只列带「✓ /」标记的】/cangjingge/shelf 返回的是**全部** skill
+            // （只是每条附了 visible 字段），过滤必须在客户端做 —— 这里不判，
+            // 菜单就会把整座书架都列出来（实测踩过）。
+            if (skill.visible !== true) continue
             const label = group.name + ' / ' + item.name + ' / ' + skill.name
             rows.push({
               name: label,

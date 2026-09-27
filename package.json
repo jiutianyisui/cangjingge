@@ -49,7 +49,7 @@
   ],
   "scripts": {
     "build": "node tools/build.mjs",
-    "test": "node tests/library.mjs && node tests/host.mjs && node tests/bundle.mjs && node tests/e2e.mjs",
-    "verify": "node tools/build.mjs && node tests/library.mjs && node tests/host.mjs && node tests/bundle.mjs && node tests/e2e.mjs"
+    "test": "node tests/library.mjs && node tests/host.mjs && node tests/bundle.mjs && node tests/e2e.mjs && node tests/candidates.mjs",
+    "verify": "node tools/build.mjs && node tests/library.mjs && node tests/host.mjs && node tests/bundle.mjs && node tests/e2e.mjs && node tests/candidates.mjs"
   }
 }
