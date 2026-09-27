@@ -205,8 +205,17 @@ try {
   fail('factory 执行报错：' + error.message)
 }
 if (typeof exported.apply !== 'function') fail('factory 没有返回 apply（段间对接错了）')
-if (JSON.stringify(exported.inject) !== JSON.stringify(['slots'])) {
-  fail('inject 不是 ["slots"]，实际是 ' + JSON.stringify(exported.inject))
+// inject 必须**同时**含 slots 与 inputTriggers：
+//   - slots：侧栏图标与主面板的槽位注册
+//   - inputTriggers：`/` 菜单的 source 注册（漏了它打 / 就看不到藏经阁）
+{
+  const want = ['slots', 'inputTriggers']
+  const got = Array.isArray(exported.inject) ? exported.inject.slice() : []
+  const missing = want.filter((k) => !got.includes(k))
+  if (missing.length > 0) {
+    fail('inject 缺少 ' + JSON.stringify(missing) + '，实际是 ' + JSON.stringify(got)
+      + '（inputTriggers 漏了会导致 `/` 菜单里没有藏经阁）')
+  }
 }
 for (const key of ['__view', '__const']) {
   if (exported[key] === undefined || exported[key] === null) fail('缺少测试钩子 ' + key)

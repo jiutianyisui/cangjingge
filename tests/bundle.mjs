@@ -57,7 +57,9 @@ ok(pkg.exports['./client'].default === './lib/client.js', 'exports ./client 指�
     ok(bundle.includes(JSON.stringify(pkg.name)), 'client.js 注册 id 是包名')
     ok(!/^\s*import\s/m.test(bundle), 'client.js 里没有 import')
     ok(!/\bJSX\b/.test(bundle) || true, 'JSX 检查（占位）')
-    ok(bundle.includes("inject = ['slots']") || bundle.includes('inject = ["slots"]'), 'client.js declare inject=slots')
+    // inject 必须**同时**含 slots 与 inputTriggers
+    ok(/inject\s*=\s*\[[^\]]*['"]slots['"][^\]]*\]/.test(bundle), 'client.js 声明 inject 含 slots')
+    ok(/inject\s*=\s*\[[^\]]*['"]inputTriggers['"][^\]]*\]/.test(bundle), 'client.js 声明 inject 含 inputTriggers')
   }
 
   if (existsSync(index)) {
