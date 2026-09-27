@@ -114,6 +114,26 @@ const body = `
       </div>
     </div>
   </div>
+</div>
+<div class="dsh-cjg-modal-mask">
+  <div class="dsh-cjg-modal">
+    <div class="dsh-cjg-modal-title">藏经阁 · 设置</div>
+    <div class="dsh-cjg-effective">
+      <div><span class="dsh-cjg-effective-k">当前扫描</span><span class="dsh-cjg-badge">内置默认</span></div>
+      <div class="dsh-cjg-effective-v">C:\\Users\\Administrator\\.dsh\\cangjingge</div>
+    </div>
+    <label>
+      <span class="dsh-cjg-field-hint">书架根目录</span>
+      <input class="dsh-cjg-input" type="text" value="" placeholder="C:\\Users\\Administrator\\.dsh\\cangjingge">
+    </label>
+    <span class="dsh-cjg-field-hint">留空 = 用当前生效值（不覆盖）。目录不存在会自动创建。<br>保存后立即重扫，不需要重启。</span>
+    <div class="dsh-cjg-modal-actions">
+      <span class="dsh-cjg-spacer"></span>
+      <button class="dsh-cjg-btn">取消</button>
+      <button class="dsh-cjg-btn">恢复默认</button>
+      <button class="dsh-cjg-btn dsh-cjg-btn-primary">保存</button>
+    </div>
+  </div>
 </div>`
 
 const html = `<!doctype html><html><head><meta charset="utf-8"><style>${theme}${CSS}

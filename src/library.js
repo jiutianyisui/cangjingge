@@ -334,3 +334,68 @@ export function buildAutoSectionText(items) {
   if (parts.length === 0) return ''
   return '以下是本工作区标记为「自动」的 skill（每轮常驻，请遵守）：\n\n' + parts.join('\n\n---\n\n')
 }
+
+// ---------------------------------------------------------------------------
+// 界面里可改的设置（_settings.json）
+//
+// 【为什么另起一个文件，而不是写插件的 profile 配置】
+//   DSH 没有给插件「改自己配置」的接口：profile 的 cordis.patch.yml 由
+//   宿主/插件管理器拥有，插件既不知道 profile 目录在哪，也不该去写它。
+//   所以界面里改的配置落在**插件自己的**一个 json 里，读的时候按优先级合并。
+//
+// 【放哪】~/.dsh/cangjingge-settings.json —— 固定的用户目录。
+//   **不能**放在书架目录里：那样一改目录就找不到上次的设置，等于无法更改。
+//
+// 【优先级】_settings.json（界面改的） > 插件配置（libraryDir） > 内置默认
+// ---------------------------------------------------------------------------
+
+/** 设置文件名（放在用户主目录的 .dsh/ 下，与书架目录解耦）。 */
+export const SETTINGS_FILE_NAME = 'cangjingge-settings.json'
+
+/**
+ * 规格化设置对象。只认我们知道的键；坏值一律丢掉（回落由调用方处理）。
+ * @param raw - 磁盘读到的原始值。
+ * @returns { libraryDir: string|null }。
+ */
+export function normalizeSettings(raw) {
+  const out = { libraryDir: null }
+  if (raw === null || typeof raw !== 'object' || Array.isArray(raw)) return out
+  const dir = raw.libraryDir
+  if (typeof dir === 'string' && dir.trim().length > 0) out.libraryDir = dir.trim()
+  return out
+}
+
+/**
+ * 按优先级挑出最终生效的书架目录。
+ *
+ * @param override - 界面里保存的值（_settings.json）。
+ * @param configured - 插件配置的值（cordis.patch.yml 的 libraryDir）。
+ * @param fallback - 内置默认值。
+ * @returns { value, source } —— 生效值与它的来源（给界面显示用）。
+ */
+export function pickLibraryDir(override, configured, fallback) {
+  const clean = (v) => (typeof v === 'string' && v.trim().length > 0 ? v.trim() : null)
+  const o = clean(override)
+  if (o !== null) return { value: o, source: 'settings' }
+  const c = clean(configured)
+  if (c !== null) return { value: c, source: 'config' }
+  return { value: String(fallback === undefined || fallback === null ? '' : fallback), source: 'default' }
+}
+
+/**
+ * 校验一个「书架目录」字符串是否可用。
+ *
+ * 只做格式检查，不碰磁盘（那是调用方的事）：空串 / 含 NUL 一律拒。
+ * 允许不存在的目录 —— 界面首次配置时它常常还没建，宿主会替它建。
+ *
+ * @param value - 用户输入。
+ * @returns { ok, value?, message? }。
+ */
+export function validateLibraryDir(value) {
+  if (typeof value !== 'string') return { ok: false, message: '路径必须是字符串。' }
+  const trimmed = value.trim()
+  if (trimmed.length === 0) return { ok: false, message: '路径不能为空。' }
+  if (trimmed.includes('\u0000')) return { ok: false, message: '路径含非法字符。' }
+  if (trimmed.length > 512) return { ok: false, message: '路径过长（上限 512 字符）。' }
+  return { ok: true, value: trimmed }
+}

@@ -25,7 +25,7 @@
 //   注册在**根作用域**，对所有会话可见（section() 的文档：注册到调用上下文的作用域）。
 // ---------------------------------------------------------------------------
 
-import { readdir, readFile, stat, writeFile } from 'node:fs/promises'
+import { readdir, readFile, stat, writeFile, mkdir } from 'node:fs/promises'
 // 同步读只在「自动注入」那条路上用（systemPrompt 的组装是同步的，见下方注释）
 import { readFileSync } from 'node:fs'
 import { homedir } from 'node:os'
@@ -42,6 +42,10 @@ import {
   withMode,
   autoSkills,
   buildAutoSectionText,
+  SETTINGS_FILE_NAME,
+  normalizeSettings,
+  pickLibraryDir,
+  validateLibraryDir,
 } from './library.js'
 
 import { defineConfig } from './toolkit.js'
@@ -257,8 +261,59 @@ export async function decorateWithModes(rootDir, tree, view) {
  */
 export function apply(ctx, config) {
   const settings = config !== null && typeof config === 'object' ? config : {}
-  const rootDir = resolveLibraryDir(settings.libraryDir)
+  const configDir = settings.libraryDir
+  const fallbackDir = defaultLibraryDir()
+
+  // 设置文件路径：固定放在 ~/.dsh/ 下，**与书架目录解耦** ——
+  // 放书架目录里的话，一改目录就找不到上次的设置，等于改不了。
+  //
+  // 【测试隔离】环境变量 DSH_CANGJINGGE_SETTINGS 可覆盖这个路径。
+  //   没有它的话，跑测试会写进用户真实的配置文件（测试必须能隔离副作用）。
+  const settingsPath = typeof process.env.DSH_CANGJINGGE_SETTINGS === 'string'
+    && process.env.DSH_CANGJINGGE_SETTINGS.length > 0
+    ? process.env.DSH_CANGJINGGE_SETTINGS
+    : join(homedir(), '.dsh', SETTINGS_FILE_NAME)
+
+  /**
+   * 读界面里保存的设置（同步；注入路径也要用）。
+   * 文件不存在 / 损坏都返回空设置 —— 设置是可再生的，不值得报错。
+   * @returns normalizeSettings 的产物。
+   */
+  function readSettingsSync() {
+    try {
+      return normalizeSettings(JSON.parse(readFileSync(settingsPath, 'utf8')))
+    } catch {
+      return normalizeSettings(null)
+    }
+  }
+
+  /**
+   * 算出当前生效的书架目录。
+   *
+   * 优先级：界面保存的值 > 插件配置 > 内置默认。
+   * @returns { value, source }。
+   */
+  function currentLibraryDir() {
+    return pickLibraryDir(readSettingsSync().libraryDir, configDir, fallbackDir)
+  }
+
+  /** 当前生效的书架目录（界面改了设置后由 refreshRootDir() 重算）。 */
+  let rootDir = resolveLibraryDir(currentLibraryDir().value)
+  /** 自动注入的短 TTL 缓存（目录或开关变化时要作废）。 */
+  let autoCache = { at: 0, text: '' }
   ctx.logger?.info?.('dsh-cangjingge: library dir = ' + rootDir)
+
+  /**
+   * 重算 rootDir（界面保存了新目录后调用）。
+   * @returns 新的绝对路径。
+   */
+  function refreshRootDir() {
+    rootDir = resolveLibraryDir(currentLibraryDir().value)
+    // 目录变了，自动注入的缓存必须作废 —— 否则最长 5 秒内还注入旧目录的内容
+    autoCache = { at: 0, text: '' }
+    ctx.logger?.info?.('dsh-cangjingge: library dir -> ' + rootDir)
+    return rootDir
+  }
 
   // -------------------------------------------------------------------------
   // 「自动」skill 的常驻注入（动态 systemPrompt section）
@@ -274,8 +329,7 @@ export function apply(ctx, config) {
   //   缓存（默认 5 秒）：开关改动能很快生效，又不至于每轮打盘。
   // -------------------------------------------------------------------------
   const AUTO_CACHE_MS = 5000
-  /** { at: number, text: string } —— 上次构建结果与时刻。 */
-  let autoCache = { at: 0, text: '' }
+  // autoCache 已在上方（refreshRootDir 之前）声明 —— 那里有为何必须前置的说明。
 
   /**
    * 同步读 skill 正文（注入路径专用）。
@@ -522,6 +576,110 @@ export function apply(ctx, config) {
       }
     },
   }), 'dsh-cangjingge: auto route')
+
+  // GET /cangjingge/settings —— 读当前生效的设置（给界面显示"现在扫的是哪"）
+  ctx.effect(() => ctx.webServer.register({
+    kind: 'exact',
+    path: '/cangjingge/settings',
+    handler: async (req, res) => {
+      try {
+        // 同一路径还注册了一个 POST（保存）。不检查 method 的话，
+        // POST 请求会打进这里并拿到一份"读结果"，静默地什么都没保存 ——
+        // 调用方以为保存成功，实际上没有任何改变。这类静默失败最难查。
+        if (req.method !== undefined && req.method !== 'GET' && req.method !== 'HEAD') {
+          sendJson(res, 405, { ok: false, message: '请用 GET。' })
+          return
+        }
+        const settings = readSettingsSync()
+        const effective = currentLibraryDir()
+        sendJson(res, 200, {
+          ok: true,
+          // 界面输入框里该显示的值 = 用户显式保存的那个（可能是空）
+          libraryDir: settings.libraryDir === undefined ? null : settings.libraryDir,
+          // 当前实际生效的目录与它的来源，让用户知道"没填时用的是哪个"
+          effective: rootDir,
+          source: effective.source,
+          config_dir: typeof configDir === 'string' && configDir.length > 0 ? configDir : null,
+          default_dir: fallbackDir,
+          settings_path: settingsPath,
+        })
+      } catch (error) {
+        sendJson(res, 500, { ok: false, message: '读取设置失败：' + String(error) })
+      }
+    },
+  }), 'dsh-cangjingge: settings route')
+
+  // POST /cangjingge/settings —— 保存书架目录（界面「设置」按钮走这里）
+  //
+  // 【写操作】来源校验同 mode 路由。
+  // 【写哪】~/.dsh/cangjingge-settings.json，**不是** profile patch ——
+  //   插件不该也不能改自己的 profile 配置（那是宿主/插件管理器的地盘）。
+  //
+  // 【传空值】表示"清除覆盖，回到插件配置/默认"。这是必要的：否则用户
+  //   一旦填过就再也回不到默认，只能去手改文件。
+  ctx.effect(() => ctx.webServer.register({
+    kind: 'exact',
+    path: '/cangjingge/settings',
+    handler: async (req, res) => {
+      try {
+        if (req.method !== 'POST') {
+          sendJson(res, 405, { ok: false, message: '请用 POST。' })
+          return
+        }
+        if (!isTrustedOrigin(req)) {
+          sendJson(res, 403, { ok: false, message: '来源不被信任，拒绝修改。' })
+          return
+        }
+        const body = await readJsonBody(req)
+        const raw = typeof body.libraryDir === 'string' ? body.libraryDir : ''
+
+        // 空串 = 清除覆盖（回到插件配置/默认），不是错误
+        let next
+        if (raw.trim().length === 0) {
+          next = normalizeSettings(null)
+        } else {
+          const checked = validateLibraryDir(raw)
+          if (checked.ok !== true) {
+            sendJson(res, 200, { ok: false, message: checked.message })
+            return
+          }
+          next = normalizeSettings({ libraryDir: checked.value })
+          // 目录不存在就建出来 —— 用户填了个新路径却忘了建目录是最常见的情况，
+          // 而"扫描一个不存在的目录"会静默得到空书架，很难归因。
+          try {
+            await mkdir(resolveLibraryDir(checked.value), { recursive: true })
+          } catch (error) {
+            sendJson(res, 200, {
+              ok: false,
+              message: '目录不可用（无法创建）：' + String(error && error.message ? error.message : error),
+            })
+            return
+          }
+        }
+
+        try {
+          await writeFile(settingsPath, JSON.stringify(next, null, 2) + '\n', 'utf8')
+        } catch (error) {
+          sendJson(res, 200, {
+            ok: false,
+            message: '设置写入失败：' + String(error && error.message ? error.message : error),
+          })
+          return
+        }
+
+        const newRoot = refreshRootDir()
+        ctx.emit?.('cangjingge/changed', { libraryDir: newRoot })
+        sendJson(res, 200, {
+          ok: true,
+          effective: newRoot,
+          libraryDir: next.libraryDir,
+          saved: next.libraryDir !== null,
+        })
+      } catch (error) {
+        sendJson(res, 500, { ok: false, message: '保存设置失败：' + String(error) })
+      }
+    },
+  }), 'dsh-cangjingge: settings save route')
 
   // GET /cangjingge/skill?path=... —— 读一个 skill 的正文
   ctx.effect(() => ctx.webServer.register({

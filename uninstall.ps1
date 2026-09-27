@@ -48,6 +48,25 @@ if (Test-Path $profilePkgPath) {
   }
 }
 
+# ---- 3) 清掉安装脚本写进 patch 的配置段 ---------------------------------------
+# 安装时写的是 `# >>> dsh-cangjingge` / `# <<< dsh-cangjingge` 成对标记块。
+# 不清掉的话，卸载后 patch 里会留一段指向本插件的孤儿配置 ——
+# 下次装回来时会因为「已有 libraryDir」而沿用旧值，看起来正常但很脏。
+$patchPath = Join-Path $profileDir 'cordis.patch.yml'
+if (Test-Path $patchPath) {
+  $patch = Get-Content $patchPath -Raw -Encoding utf8
+  $begin = '# >>> dsh-cangjingge'
+  $end = '# <<< dsh-cangjingge'
+  $own = [regex]::Escape($begin) + '(?s).*?' + [regex]::Escape($end) + '\r?\n?'
+  $cleaned = [regex]::Replace($patch, $own, '').TrimEnd() + [char]10
+  if ($cleaned -ne $patch) {
+    [IO.File]::WriteAllText($patchPath, $cleaned, (New-Object System.Text.UTF8Encoding($false)))
+    Write-Host 'cleaned: cordis.patch.yml 里的 dsh-cangjingge 配置段已移除'
+  } else {
+    Write-Host 'cleaned: cordis.patch.yml 里没有本插件的配置段，跳过'
+  }
+}
+
 Write-Host ''
 Write-Host '卸掉了。重启桌面端后左侧栏的小阁楼图标会消失。'
 Write-Host '（藏经阁目录与 skill 文件不会被删除。）'

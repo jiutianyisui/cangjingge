@@ -88,14 +88,20 @@ await writeFile(join(root, '易经', '乾', 'noise.png'), 'x', 'utf8')
 const secret = join(tmpdir(), 'cjg-secret-' + String(process.pid) + '.txt')
 await writeFile(secret, 'SECRET', 'utf8')
 
+// 测试隔离：把设置文件重定向到临时目录，避免写进用户真实配置
+const settingsFile = join(tmpdir(), 'cjg-settings-' + String(process.pid) + '.json')
+process.env.DSH_CANGJINGGE_SETTINGS = settingsFile
+
 const ctx = makeCtx()
 host.apply(ctx, { libraryDir: root })
 
-eq(routes.length, 5, '注册了五个路由')
+eq(routes.length, 7, '注册了七个路由（settings 的 GET/POST 各算一条）')
 eq(routes.map((r) => r.path).sort(), [
   '/cangjingge/auto',
   '/cangjingge/candidates',
   '/cangjingge/mode',
+  '/cangjingge/settings',
+  '/cangjingge/settings',
   '/cangjingge/shelf',
   '/cangjingge/skill',
 ], '路由路径正确')
@@ -192,10 +198,20 @@ function fakeReq(url, method, body) {
   }
 }
 async function callPost(path, url, body) {
-  const route = routes.find((r) => r.path === path)
-  const res = fakeRes()
-  await route.handler(fakeReq(url, 'POST', body), res)
-  return { status: res.state.status, json: JSON.parse(res.state.body) }
+  // 同一路径可能注册了两条（如 settings 的 GET 与 POST）——
+  // 这里要找**接受 POST 的那条**，不能无脑取第一条（那样会打进 GET handler）。
+  // 每条候选路由用**独立的 res**：复用同一个 res 会让被拒的那次留下脏状态。
+  const candidates = routes.filter((r) => r.path === path)
+  let last = null
+  for (const route of candidates) {
+    const res = fakeRes()
+    await route.handler(fakeReq(url, 'POST', body), res)
+    if (res.state.status !== 405) {
+      return { status: res.state.status, json: JSON.parse(res.state.body) }
+    }
+    last = { status: res.state.status, json: JSON.parse(res.state.body) }
+  }
+  return last
 }
 
 const skillA = join(root, '易经', '乾', 'a.md')
@@ -273,6 +289,71 @@ const skillC = join(root, '兵法', '谋', 'c.md')
   // 缺 path -> ok:false
   const r = await callPost('/cangjingge/mode', '/cangjingge/mode', JSON.stringify({ mode: 'auto' }))
   eq(r.json.ok, false, '缺 path 返回 ok=false')
+}
+
+// ---- 设置路由（书架目录可改）--------------------------------------------------
+{
+  const r = await callRoute('/cangjingge/settings', '/cangjingge/settings')
+  eq(r.json.ok, true, 'GET settings ok=true')
+  eq(r.json.source, 'config', '未保存过时来源是插件配置')
+  eq(r.json.effective, root, '生效目录是插件配置的（resolve 后）')
+  eq(r.json.libraryDir, null, '界面值为空（从未保存过）')
+}
+
+{
+  // 存一个新目录 -> rootDir 立即切换
+  const newDir = await mkdtemp(join(tmpdir(), 'cjg-new-'))
+  await mkdir(join(newDir, '新分组', '新子项'), { recursive: true })
+  await writeFile(join(newDir, '新分组', '新子项', 'n.md'), '新正文', 'utf8')
+
+  const r = await callPost('/cangjingge/settings', '/cangjingge/settings', JSON.stringify({ libraryDir: newDir }))
+  eq(r.json.ok, true, '保存新目录成功')
+  eq(r.json.saved, true, 'saved=true')
+  ok(String(r.json.effective).includes('cjg-new-'), '生效目录已切换')
+
+  const s = await callRoute('/cangjingge/shelf', '/cangjingge/shelf')
+  eq(s.json.root, r.json.effective, 'shelf 的 root 跟着变')
+  eq(s.json.view.groups[0].name, '新分组', '新目录的内容被扫到')
+
+  const g = await callRoute('/cangjingge/settings', '/cangjingge/settings')
+  eq(g.json.source, 'settings', '来源变成界面设置')
+
+  await rm(newDir, { recursive: true, force: true })
+}
+
+{
+  // 传空 -> 清除覆盖，回到插件配置
+  const r = await callPost('/cangjingge/settings', '/cangjingge/settings', JSON.stringify({ libraryDir: '' }))
+  eq(r.json.ok, true, '清除覆盖成功')
+  eq(r.json.saved, false, 'saved=false（回到默认）')
+
+  const g = await callRoute('/cangjingge/settings', '/cangjingge/settings')
+  eq(g.json.source, 'config', '来源回到插件配置')
+  eq(g.json.effective, root, '生效目录回到插件配置的')
+}
+
+{
+  // 纯空白 = 清除覆盖（不是错误）
+  const r = await callPost('/cangjingge/settings', '/cangjingge/settings', JSON.stringify({ libraryDir: '   ' }))
+  eq(r.json.ok, true, '纯空白 = 清除覆盖（不是错误）')
+}
+
+{
+  // GET 打写路由 -> 405
+  const route = routes.filter((x) => x.path === '/cangjingge/settings')[1]
+  const res = fakeRes()
+  await route.handler(fakeReq('/cangjingge/settings', 'GET', ''), res)
+  eq(res.state.status, 405, 'GET 打 settings POST 路由返回 405')
+}
+
+{
+  // 跨源被拒
+  const route = routes.filter((x) => x.path === '/cangjingge/settings')[1]
+  const res = fakeRes()
+  const req = fakeReq('/cangjingge/settings', 'POST', JSON.stringify({ libraryDir: 'E:/x' }))
+  req.headers = { origin: 'https://evil.example', host: 'localhost:1' }
+  await route.handler(req, res)
+  eq(res.state.status, 403, '跨源来源被拒 403')
 }
 
 // ---- 自动注入（systemPrompt.section）------------------------------------------

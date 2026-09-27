@@ -21,6 +21,10 @@ import {
   stripFrontmatter,
   buildAutoSectionText,
   AUTO_INJECT_MAX_CHARS,
+  SETTINGS_FILE_NAME,
+  normalizeSettings,
+  pickLibraryDir,
+  validateLibraryDir,
   STATE_FILE_NAME,
   MODE_AUTO,
   MODE_MANUAL,
@@ -226,6 +230,42 @@ eq(normalizeState({ skills: [] }).skills, {}, 'skills 是数组 -> 空')
   ])
   ok(long.includes('已截断'), '超长正文被截断并标记')
   ok(long.length < AUTO_INJECT_MAX_CHARS + 400, '截断后长度受控')
+}
+
+// ---- 设置（书架目录）纯函数 ---------------------------------------------------
+eq(SETTINGS_FILE_NAME, 'cangjingge-settings.json', '设置文件名')
+
+{
+  eq(normalizeSettings(null).libraryDir, null, 'null -> 无覆盖')
+  eq(normalizeSettings('x').libraryDir, null, '非对象 -> 无覆盖')
+  eq(normalizeSettings({ libraryDir: '  E:/a  ' }).libraryDir, 'E:/a', '值被 trim')
+  eq(normalizeSettings({ libraryDir: '' }).libraryDir, null, '空串 -> 无覆盖')
+  eq(normalizeSettings({ libraryDir: 7 }).libraryDir, null, '非字符串 -> 无覆盖')
+  eq(normalizeSettings({ other: 1 }).libraryDir, null, '无关键 -> 无覆盖')
+}
+
+{
+  const a = pickLibraryDir('E:/o', 'E:/c', 'E:/d')
+  eq(a.value, 'E:/o', 'override 优先')
+  eq(a.source, 'settings', 'source=settings')
+  const b = pickLibraryDir(null, 'E:/c', 'E:/d')
+  eq(b.value, 'E:/c', '回落 config')
+  eq(b.source, 'config', 'source=config')
+  const c = pickLibraryDir(null, null, 'E:/d')
+  eq(c.value, 'E:/d', '再回落 default')
+  eq(c.source, 'default', 'source=default')
+  eq(pickLibraryDir('   ', 'E:/c', 'E:/d').value, 'E:/c', '空白串视为无覆盖')
+}
+
+{
+  eq(validateLibraryDir('E:/x').ok, true, '正常路径通过')
+  eq(validateLibraryDir('  E:/x  ').value, 'E:/x', '校验后 trim')
+  eq(validateLibraryDir('').ok, false, '空串拒绝')
+  eq(validateLibraryDir('   ').ok, false, '纯空白拒绝')
+  eq(validateLibraryDir(null).ok, false, 'null 拒绝')
+  eq(validateLibraryDir(7).ok, false, '非字符串拒绝')
+  eq(validateLibraryDir('a\u0000b').ok, false, 'NUL 拒绝')
+  eq(validateLibraryDir('x'.repeat(600)).ok, false, '超长拒绝')
 }
 
 // ---- 结果 ---------------------------------------------------------------------

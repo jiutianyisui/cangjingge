@@ -39,6 +39,8 @@ const SHELF_URL = '/cangjingge/shelf'
 const SKILL_URL = '/cangjingge/skill'
 /** 自动/手动开关路由。 */
 const MODE_URL = '/cangjingge/mode'
+/** 设置读写路由（书架目录）。 */
+const SETTINGS_URL = '/cangjingge/settings'
 /** 输入触发菜单的 source 名（与 `/` 组合成 /藏经阁）。 */
 const SOURCE_TRIGGER = '/'
 const SOURCE_NAME = 'cangjingge'
@@ -166,6 +168,12 @@ const CSS = [
   '.dsh-cjg-input{display:block;width:100%;box-sizing:border-box;padding:5px 8px;font-size:12px;font-family:inherit;color:var(--dsw-alias-label-primary);background:var(--dsw-alias-bg-layer-1);border:1px solid var(--dsw-alias-border-l2);border-radius:8px;outline:none;margin-bottom:10px}',
   '.dsh-cjg-input:focus{border-color:var(--dsh-cjg-gold-line)}',
   '.dsh-cjg-modal-actions{display:flex;gap:6px;margin-top:4px}',
+  '.dsh-cjg-modal .dsh-cjg-input{margin-bottom:6px}',
+  '.dsh-cjg-field-hint{display:block;font-size:10.5px;color:var(--dsw-alias-label-tertiary);line-height:1.6;margin-bottom:10px}',
+  '.dsh-cjg-effective{padding:7px 10px;border-radius:8px;background:var(--dsw-alias-bg-layer-1);border:1px solid var(--dsw-alias-border-l1);font-size:11px;line-height:1.7;margin-bottom:10px;word-break:break-all}',
+  '.dsh-cjg-effective-k{color:var(--dsw-alias-label-tertiary);margin-right:5px}',
+  '.dsh-cjg-effective-v{font-family:var(--dsw-specific-font-family-code),monospace;color:var(--dsw-alias-label-primary)}',
+  '.dsh-cjg-badge{display:inline-block;padding:0 6px;border-radius:999px;font-size:10px;border:1px solid var(--dsh-cjg-gold-line);color:var(--dsh-cjg-gold);background:var(--dsh-cjg-gold-soft)}',
 
   // ── 滚动条：细、暗、悬停才显眼 ──────────────────────────────────────────
   '.dsh-cjg-list::-webkit-scrollbar,.dsh-cjg-list-top::-webkit-scrollbar,.dsh-cjg-body::-webkit-scrollbar,.dsh-cjg-pre::-webkit-scrollbar{width:7px;height:7px}',
@@ -270,10 +278,47 @@ async function postMode(path, mode) {
   }
 }
 
+/**
+ * 读当前设置（现在扫的是哪个目录、来源是什么）。
+ * @returns { ok, libraryDir, effective, source, default_dir, settings_path, message }。
+ */
+async function fetchSettings() {
+  try {
+    const response = await fetch(SETTINGS_URL, { headers: { accept: 'application/json' } })
+    if (!response.ok) return { ok: false, message: '宿主返回 HTTP ' + String(response.status) }
+    const data = await response.json()
+    if (data === null || typeof data !== 'object') return { ok: false, message: '宿主返回的不是 JSON 对象' }
+    return data
+  } catch (error) {
+    return { ok: false, message: '读取设置失败：' + String(error && error.message ? error.message : error) }
+  }
+}
+
+/**
+ * 保存书架目录。传空串表示「清除覆盖，回到默认」。
+ * @param libraryDir - 新目录（空串 = 清除）。
+ * @returns { ok, effective, saved, message }。
+ */
+async function postSettings(libraryDir) {
+  try {
+    const response = await fetch(SETTINGS_URL, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ libraryDir }),
+    })
+    if (response.status === 403) return { ok: false, message: '宿主拒绝了这次修改（来源不被信任）。' }
+    if (!response.ok) return { ok: false, message: '宿主返回 HTTP ' + String(response.status) }
+    const data = await response.json()
+    if (data === null || typeof data !== 'object') return { ok: false, message: '宿主返回的不是 JSON 对象' }
+    return data
+  } catch (error) {
+    return { ok: false, message: String(error && error.message ? error.message : error) }
+  }
+}
+
 // ===========================================================================
 // 小组件
 // ===========================================================================
-
 /**
  * 侧栏图标（sidebar.panellist）：画一个「小阁楼」。
  *
@@ -390,6 +435,69 @@ function Column(props) {
 }
 
 /**
+ * 设置弹窗：改书架根目录。
+ *
+ * 【为什么需要它】DSH 没有给插件"自动生成设置表单"的机制 —— 插件配置页
+ * 要插件自己写 UI（已对 ui-settings-plugin-inventory / ui-settings-plugins
+ * 的 README 核实：前者明确是只读清单，后者的配置页由各插件自己的伴生包提供）。
+ * 所以这里自带一个输入框，改完写进插件自己的 settings 文件。
+ *
+ * @param props - { info, busy, onClose, onSubmit }。
+ * @returns React 元素。
+ */
+function SettingsDialog(props) {
+  const info = props.info !== null && props.info !== undefined ? props.info : {}
+  // 输入框初值 = 用户显式保存过的值；没保存过就留空（占位符显示当前生效值）
+  const [value, setValue] = React.useState(
+    typeof info.libraryDir === 'string' ? info.libraryDir : '',
+  )
+  const busy = props.busy === true
+  const effective = typeof info.effective === 'string' ? info.effective : ''
+  const source = typeof info.source === 'string' ? info.source : ''
+  const sourceLabel = source === 'settings' ? '界面设置' : source === 'config' ? '插件配置' : '内置默认'
+
+  return React.createElement('div', { className: 'dsh-cjg-modal-mask' },
+    React.createElement('div', { className: 'dsh-cjg-modal' },
+      React.createElement('div', { className: 'dsh-cjg-modal-title' }, '藏经阁 · 设置'),
+      React.createElement('div', { className: 'dsh-cjg-effective' },
+        React.createElement('div', null,
+          React.createElement('span', { className: 'dsh-cjg-effective-k' }, '当前扫描'),
+          React.createElement('span', { className: 'dsh-cjg-badge' }, sourceLabel)),
+        React.createElement('div', { className: 'dsh-cjg-effective-v' }, effective)),
+
+      React.createElement('label', null,
+        React.createElement('span', { className: 'dsh-cjg-field-hint' }, '书架根目录'),
+        React.createElement('input', {
+          type: 'text',
+          className: 'dsh-cjg-input',
+          value,
+          placeholder: effective,
+          disabled: busy,
+          onChange: (event) => setValue(event.target.value),
+        })),
+      React.createElement('span', { className: 'dsh-cjg-field-hint' },
+        '留空 = 用当前生效值（不覆盖）。目录不存在会自动创建。',
+        React.createElement('br'),
+        '保存后立即重扫，不需要重启。'),
+
+      React.createElement('div', { className: 'dsh-cjg-modal-actions' },
+        React.createElement('span', { className: 'dsh-cjg-spacer' }),
+        React.createElement('button', {
+          type: 'button', className: 'dsh-cjg-btn', disabled: busy,
+          onClick: props.onClose,
+        }, '取消'),
+        React.createElement('button', {
+          type: 'button', className: 'dsh-cjg-btn', disabled: busy,
+          title: '清除界面里保存的目录，回到插件配置或内置默认',
+          onClick: () => props.onSubmit(''),
+        }, '恢复默认'),
+        React.createElement('button', {
+          type: 'button', className: 'dsh-cjg-btn dsh-cjg-btn-primary', disabled: busy,
+          onClick: () => props.onSubmit(value),
+        }, busy ? '保存中…' : '保存'))))
+}
+
+/**
  * 右侧：skill 详情 + 操作。
  *
  * 【操作里为什么是「复制」+「在输入框打 / 插入」两种】
@@ -474,6 +582,9 @@ function ShelfPanel() {
     mode: 'manual', switching: false,
   })
   const [flash, setFlash] = React.useState(null)
+  /** 设置弹窗：null = 关闭；否则是当前设置信息。 */
+  const [settingsOpen, setSettingsOpen] = React.useState(null)
+  const [savingSettings, setSavingSettings] = React.useState(false)
   const alive = React.useRef(true)
   /** selection 的镜像：给事件回调读最新值（避免闭包捕获旧 state）。 */
   const selectionRef = React.useRef({ group: null, item: null })
@@ -580,6 +691,48 @@ function ShelfPanel() {
   }, [detail.skill, load])
 
   /**
+   * 打开设置弹窗（先拉当前设置，让输入框有正确的初值）。
+   */
+  const openSettings = React.useCallback(async () => {
+    setFlash(null)
+    const info = await fetchSettings()
+    if (!alive.current) return
+    if (info !== null && info.ok === true) setSettingsOpen(info)
+    else setFlash({ kind: 'error', text: '读取设置失败：' + String(info === null ? '宿主无响应' : info.message) })
+  }, [])
+
+  /**
+   * 保存书架目录。传空串 = 清除覆盖（回到插件配置 / 内置默认）。
+   *
+   * 【保存后立即重扫】不必重启也不需要手动点刷新 —— 宿主的 rootDir 已经换了，
+   * 这次 load() 拿到的就是新目录的内容。
+   * @param value - 用户输入的目录（空串表示清除覆盖）。
+   */
+  const saveSettings = React.useCallback(async (value) => {
+    setSavingSettings(true)
+    setFlash(null)
+    const result = await postSettings(value)
+    if (!alive.current) return
+    setSavingSettings(false)
+    if (result !== null && result.ok === true) {
+      setSettingsOpen(null)
+      // 目录变了：清掉右侧详情（它属于旧目录），并重扫
+      selectionRef.current = { group: null, item: null }
+      setSelection(selectionRef.current)
+      setDetail({ skill: null, text: '', loading: false, error: null, truncated: false, mode: 'manual', switching: false })
+      setFlash({
+        kind: 'ok',
+        text: result.saved === true
+          ? '已保存，正在扫描：' + String(result.effective)
+          : '已恢复默认：' + String(result.effective),
+      })
+      void load(null, null)
+    } else {
+      setFlash({ kind: 'error', text: '保存失败：' + String(result === null ? '宿主无响应' : result.message) })
+    }
+  }, [load])
+
+  /**
    * 复制到剪贴板。优先用 navigator.clipboard，失败时退回一个隐藏 textarea +
    * document.execCommand('copy')（老环境兜底）。
    * 失败时给出提示而不是静默 —— 用户会以为"复制成功"然后粘贴出旧内容。
@@ -620,6 +773,11 @@ function ShelfPanel() {
       React.createElement('span', { className: 'dsh-cjg-title' }, '藏经阁'),
       React.createElement('span', { className: 'dsh-cjg-sub', title: rootText }, rootText),
       React.createElement('span', { className: 'dsh-cjg-spacer' }),
+      React.createElement('button', {
+        type: 'button', className: 'dsh-cjg-btn',
+        title: '更改书架根目录',
+        onClick: () => { void openSettings() },
+      }, '设置'),
       React.createElement('button', {
         type: 'button', className: 'dsh-cjg-btn',
         onClick: () => { void load(selectionRef.current.group, selectionRef.current.item) },
@@ -678,7 +836,13 @@ function ShelfPanel() {
                 error: detail.error, truncated: detail.truncated, onCopy: copy,
                 mode: detail.mode, switching: detail.switching,
                 onMode: (mode) => { void switchMode(mode) },
-              })))))
+              })))),
+    settingsOpen === null ? null : React.createElement(SettingsDialog, {
+      info: settingsOpen,
+      busy: savingSettings,
+      onClose: () => setSettingsOpen(null),
+      onSubmit: (value) => { void saveSettings(value) },
+    }))
 }
 
 // ===========================================================================
@@ -842,8 +1006,8 @@ exports.apply = apply
 // 都明确列了 'inputTriggers'。这里照做。
 // 'slots' 同样必要：侧栏图标与主面板要等槽位声明后才能注册。
 exports.inject = ['slots', 'inputTriggers']
-exports.__view = { ShelfPanel, PanelIcon, Column, SkillDetail, FolderGlyph, FileGlyph }
+exports.__view = { ShelfPanel, PanelIcon, Column, SkillDetail, SettingsDialog, FolderGlyph, FileGlyph }
 exports.__const = {
   CSS, ICON_SLOT, MAIN_SLOT, PANEL_ID, SOURCE_TRIGGER, SOURCE_NAME,
-  SHELF_URL, SKILL_URL, MODE_URL,
+  SHELF_URL, SKILL_URL, MODE_URL, SETTINGS_URL,
 }
