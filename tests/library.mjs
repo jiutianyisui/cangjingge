@@ -14,6 +14,13 @@ import {
   skillInsertText,
   skillCandidates,
   parseCandidateValue,
+  groupCandidates,
+  filterCandidates,
+  VISIBLE_FILE_NAME,
+  normalizeVisible,
+  isVisible,
+  withVisible,
+  visibleSkills,
   SETTINGS_FILE_NAME,
   normalizeSettings,
   pickLibraryDir,
@@ -146,6 +153,66 @@ eq(parseCandidateValue('不是JSON'), null, '坏 JSON 返回 null')
 eq(parseCandidateValue('{"kind":"other"}'), null, '非 skill kind 返回 null')
 eq(parseCandidateValue(''), null, '空串返回 null')
 eq(parseCandidateValue(null), null, 'null 返回 null')
+
+// ---- `/` 菜单可见性（状态纯函数）----------------------------------------------
+eq(VISIBLE_FILE_NAME, '_visible.json', '可见性文件名以下划线开头（会被书架过滤）')
+
+{
+  // 只有 true 被保留；false / 杂值一律丢掉（取消勾选 = 删键）
+  const s = normalizeVisible({ skills: { '/a.md': true, '/b.md': false, '/c.md': 'yes', '/d.md': 1 } })
+  eq(s.skills['/a.md'], true, '保留 true')
+  eq(s.skills['/b.md'], undefined, '丢掉 false')
+  eq(s.skills['/c.md'], undefined, '丢掉字符串')
+  eq(s.skills['/d.md'], undefined, '丢掉数字')
+}
+
+eq(normalizeVisible(null).skills, {}, 'null 状态 -> 空')
+eq(normalizeVisible('x').skills, {}, '非对象状态 -> 空')
+eq(normalizeVisible({ skills: [] }).skills, {}, 'skills 是数组 -> 空')
+
+{
+  // 默认不显示：这是「方案 A」的核心 —— 名单里没有 = 不在 / 菜单出现
+  eq(isVisible(normalizeVisible(null), '/x.md'), false, '没记录过 = 不显示')
+  const s = withVisible(normalizeVisible(null), '/x.md', true)
+  eq(isVisible(s, '/x.md'), true, '设为显示后读到 true')
+  eq(isVisible(normalizeVisible(null), '/x.md'), false, 'withVisible 不改原对象')
+  const back = withVisible(s, '/x.md', false)
+  eq(isVisible(back, '/x.md'), false, '设回隐藏')
+  eq(Object.prototype.hasOwnProperty.call(back.skills, '/x.md'), false, '设回隐藏时删除键')
+}
+
+{
+  let s = normalizeVisible(null)
+  s = withVisible(s, '/b.md', true)
+  s = withVisible(s, '/a.md', true)
+  eq(visibleSkills(s), ['/a.md', '/b.md'], '可见清单已排序')
+}
+
+// ---- 候选行的两段式（分组行 + 关键词过滤）---------------------------------------
+{
+  eq(groupCandidates(null), [], 'null -> 空')
+  const rows = groupCandidates([
+    { name: '有声', visibleCount: 3 },
+    { name: '空的', visibleCount: 0 },
+    { name: '', visibleCount: 5 },
+  ])
+  eq(rows.length, 1, '只列有可见项的分组')
+  eq(rows[0].name, '有声', '分组名正确')
+  eq(rows[0].section, '分组', 'section 标记为分组')
+  eq(JSON.parse(rows[0].value).kind, 'group', 'value 是可解析的分组引用')
+}
+
+{
+  const rows = [
+    { name: '团队 / 编制 / 规程.md', description: '/a/团队/编制/规程.md' },
+    { name: '兵法 / 谋 / 孙子.md', description: '/a/兵法/谋/孙子.md' },
+  ]
+  eq(filterCandidates(rows, '').length, 2, '空关键词返回全部')
+  eq(filterCandidates(rows, '规程').length, 1, '按名字过滤')
+  eq(filterCandidates(rows, '兵法').length, 1, '按面包屑里的分组名过滤')
+  eq(filterCandidates(rows, 'PROCEDURE').length, 0, '大小写不敏感（无命中）')
+  eq(filterCandidates(rows, '规程.md').length, 1, '按路径片段也能命中')
+}
 
 // ---- 设置（书架目录）纯函数 ---------------------------------------------------
 eq(SETTINGS_FILE_NAME, 'cangjingge-settings.json', '设置文件名')

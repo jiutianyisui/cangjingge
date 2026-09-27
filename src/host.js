@@ -31,6 +31,10 @@ import {
   shelfView,
   SKILL_MAX_BYTES,
   SETTINGS_FILE_NAME,
+  VISIBLE_FILE_NAME,
+  normalizeVisible,
+  isVisible,
+  withVisible,
   normalizeSettings,
   pickLibraryDir,
   validateLibraryDir,
@@ -197,6 +201,40 @@ export async function readSkill(rootDir, targetPath) {
 }
 
 /**
+ * 读 `/` 菜单可见性状态（根目录下的 _visible.json）。
+ * 文件不存在或损坏都返回空状态 —— 默认「全不显示」，状态可再生产，不值得报错。
+ * @param rootDir - 藏经阁根目录。
+ * @returns 规格化后的状态。
+ */
+export async function readVisible(rootDir) {
+  try {
+    const text = await readFile(join(rootDir, VISIBLE_FILE_NAME), 'utf8')
+    return normalizeVisible(JSON.parse(text))
+  } catch {
+    return normalizeVisible(null)
+  }
+}
+
+/**
+ * 写 `/` 菜单可见性状态。
+ * @param rootDir - 藏经阁根目录。
+ * @param state - 规格化后的状态。
+ * @returns 是否写成功。
+ */
+export async function writeVisible(rootDir, state) {
+  try {
+    await writeFile(
+      join(rootDir, VISIBLE_FILE_NAME),
+      JSON.stringify(normalizeVisible(state), null, 2) + '\n',
+      'utf8',
+    )
+    return true
+  } catch {
+    return false
+  }
+}
+
+/**
  * 插件主体。
  * @param ctx - 宿主侧根上下文。
  * @param config - 已解析的配置。
@@ -352,25 +390,102 @@ export function apply(ctx, config) {
     path: '/cangjingge/shelf',
     handler: async (req, res) => {
       try {
+        const state = await readVisible(rootDir)
         const tree = await scanLibrary(rootDir)
         const group = queryParam(req, 'group')
         const item = queryParam(req, 'item')
         const view = shelfView(tree, { group, item })
+        // 给每个 skill 附上「是否在 `/` 菜单显示」；并给出整棵树的勾选统计，
+        // 供界面显示「本组有几个可插入」以及 /candidates 的第一屏用。
+        const skills = Array.isArray(view.skills)
+          ? view.skills.map((s) => ({ ...s, visible: isVisible(state, s.path) }))
+          : []
+        const groupStats = tree.groups.map((g) => {
+          let total = 0
+          let visibleCount = 0
+          for (const i of g.items) {
+            for (const s of i.skills) {
+              total += 1
+              if (isVisible(state, s.path)) visibleCount += 1
+            }
+          }
+          return { name: g.name, count: g.items.length, total, visibleCount }
+        })
         sendJson(res, 200, {
           ok: true,
           root: rootDir,
-          groups: tree.groups.map((g) => ({
-            name: g.name,
-            count: g.items.length,
-            items: g.items.map((i) => ({ name: i.name, count: i.skills.length })),
-          })),
-          view,
+          groups: groupStats,
+          view: { ...view, skills },
         })
       } catch (error) {
         sendJson(res, 500, { ok: false, message: '扫描书架失败：' + String(error) })
       }
     },
   }), 'dsh-cangjingge: shelf route')
+
+  // POST /cangjingge/visible —— 设置某个 skill 是否在 `/` 菜单显示
+  //
+  // 【这是写操作】所以要做来源校验（与 settings 同一策略）。
+  // 语义：只改 _visible.json 里的一条记录。绝对不动 skill 文件本身。
+  ctx.effect(() => ctx.webServer.register({
+    kind: 'exact',
+    path: '/cangjingge/visible',
+    handler: async (req, res) => {
+      try {
+        if (req.method !== 'POST') {
+          sendJson(res, 405, { ok: false, message: '请用 POST。' })
+          return
+        }
+        if (!isTrustedOrigin(req)) {
+          sendJson(res, 403, { ok: false, message: '来源不被信任，拒绝修改。' })
+          return
+        }
+        const body = await readJsonBody(req)
+
+        // 批量设置：paths 数组 + visible 布尔（「全选 / 全不选」走这条）。
+        if (Array.isArray(body.paths)) {
+          const root = resolve(rootDir)
+          let state = await readVisible(rootDir)
+          for (const p of body.paths) {
+            if (typeof p !== 'string') continue
+            const full = resolve(p)
+            if (full !== root && !full.startsWith(root + sep)) continue
+            state = withVisible(state, full, body.visible === true)
+          }
+          const saved = await writeVisible(rootDir, state)
+          if (!saved) {
+            sendJson(res, 200, { ok: false, message: '可见性文件写入失败。' })
+            return
+          }
+          sendJson(res, 200, { ok: true, visible: true })
+          return
+        }
+
+        const target = typeof body.path === 'string' ? body.path : ''
+        if (target.length === 0) {
+          sendJson(res, 200, { ok: false, message: '缺少 path。' })
+          return
+        }
+        // 与读 skill 同一条路径校验：只能在根目录之内
+        const root = resolve(rootDir)
+        const full = resolve(target)
+        if (full !== root && !full.startsWith(root + sep)) {
+          sendJson(res, 200, { ok: false, message: '拒绝修改藏经阁之外的路径。' })
+          return
+        }
+        const state = await readVisible(rootDir)
+        const next = withVisible(state, full, body.visible === true)
+        const saved = await writeVisible(rootDir, next)
+        if (!saved) {
+          sendJson(res, 200, { ok: false, message: '可见性文件写入失败。' })
+          return
+        }
+        sendJson(res, 200, { ok: true, path: full, visible: body.visible === true })
+      } catch (error) {
+        sendJson(res, 500, { ok: false, message: '切换失败：' + String(error) })
+      }
+    },
+  }), 'dsh-cangjingge: visible route')
 
   // /cangjingge/settings —— GET 读设置 / POST 保存书架目录
   //
@@ -505,11 +620,29 @@ export function apply(ctx, config) {
     path: '/cangjingge/candidates',
     handler: async (req, res) => {
       try {
+        const state = await readVisible(rootDir)
         const tree = await scanLibrary(rootDir)
         const group = queryParam(req, 'group')
         const item = queryParam(req, 'item')
         const view = shelfView(tree, { group, item })
-        sendJson(res, 200, { ok: true, view })
+        // 只给「已在 `/` 菜单显示」的 skill；每个对象都带上 visible 字段，
+        // 客户端 / 菜单据此渲染（不另加请求 —— mode 本来就已经在数据里）。
+        const skills = Array.isArray(view.skills)
+          ? view.skills
+            .filter((s) => isVisible(state, s.path))
+            .map((s) => ({ ...s, visible: true }))
+          : []
+        // 第一屏（空 query）用：每个分组里有多少个 skill 已勾选显示。
+        const groups = tree.groups.map((g) => {
+          let visibleCount = 0
+          for (const i of g.items) {
+            for (const s of i.skills) {
+              if (isVisible(state, s.path)) visibleCount += 1
+            }
+          }
+          return { name: g.name, visibleCount }
+        })
+        sendJson(res, 200, { ok: true, view: { ...view, skills }, groups })
       } catch (error) {
         sendJson(res, 500, { ok: false, message: '列出候选失败：' + String(error) })
       }

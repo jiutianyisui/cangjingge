@@ -91,12 +91,13 @@ process.env.DSH_CANGJINGGE_SETTINGS = settingsFile
 const ctx = makeCtx()
 host.apply(ctx, { libraryDir: root })
 
-eq(routes.length, 4, '注册了四个路由（settings 的 GET/POST 合成一条）')
+eq(routes.length, 5, '注册了五个路由（settings 的 GET/POST 合成一条）')
 eq(routes.map((r) => r.path).sort(), [
   '/cangjingge/candidates',
   '/cangjingge/settings',
   '/cangjingge/shelf',
   '/cangjingge/skill',
+  '/cangjingge/visible',
 ], '路由路径正确')
 // 【关键回归】同一 path 不许注册两条 exact 路由 —— dsh 的 webServer 会抛
 // duplicate exact route，而抛错发生在 ctx.effect 里 -> 整个插件的 effect
@@ -223,12 +224,101 @@ const skillA = join(root, '易经', '乾', 'a.md')
 const skillC = join(root, '兵法', '谋', 'c.md')
 
 {
-  // shelf 正常工作，且不再带 mode / auto 字段（自动功能已整体移除）
+  // shelf 正常工作：默认全部「不在 / 菜单显示」，且不再带已废弃的 mode / auto 字段
   const r = await callRoute('/cangjingge/shelf', '/cangjingge/shelf?group=' + encodeURIComponent('易经') + '&item=' + encodeURIComponent('乾'))
   const a = r.json.view.skills.find((s) => s.path === skillA)
   ok(a !== undefined, '能找到 a.md')
   eq(a.mode, undefined, 'skill 不再带 mode 字段')
   eq(r.json.auto, undefined, 'shelf 不再回传 auto 清单')
+  eq(a.visible, false, '默认不在 / 菜单显示')
+  // 分组统计：整组的 total / visibleCount 都要有，供界面与 /candidates 第一屏用
+  const g = r.json.groups.find((x) => x.name === '易经')
+  ok(g !== undefined && g.total >= 2, '分组统计含 total')
+  eq(g.visibleCount, 0, '默认没有可见项')
+}
+
+// ---- `/` 菜单可见性（POST /cangjingge/visible）--------------------------------
+{
+  // 单个打开
+  const r = await callPost('/cangjingge/visible', '/cangjingge/visible', JSON.stringify({ path: skillA, visible: true }))
+  eq(r.json.ok, true, '设为显示成功')
+  eq(r.json.visible, true, '回传 visible=true')
+
+  // shelf 上要能看到新状态
+  const s = await callRoute('/cangjingge/shelf', '/cangjingge/shelf?group=' + encodeURIComponent('易经') + '&item=' + encodeURIComponent('乾'))
+  const a = s.json.view.skills.find((x) => x.path === skillA)
+  eq(a.visible, true, 'shelf 反映 visible')
+
+  // 状态文件确实落盘（下划线开头，不会出现在书架里）
+  const raw = JSON.parse(await readFile(join(root, '_visible.json'), 'utf8'))
+  eq(raw.skills[skillA], true, '_visible.json 记录了该路径')
+}
+
+{
+  // `/` 菜单只列已勾选的：candidates 返回的 view.skills 已过滤
+  const r = await callRoute('/cangjingge/candidates', '/cangjingge/candidates?group=' + encodeURIComponent('易经') + '&item=' + encodeURIComponent('乾'))
+  eq(r.json.ok, true, 'candidates ok=true')
+  const paths = r.json.view.skills.map((x) => x.path)
+  eq(paths.includes(skillA), true, '已勾选的出现在候选里')
+  eq(paths.length, 1, '未勾选的不出现在候选里')
+  // 第一屏（空 query）用的分组统计
+  const g = r.json.groups.find((x) => x.name === '易经')
+  eq(g.visibleCount, 1, '分组可见计数正确')
+}
+
+{
+  // 批量隐藏（全不选）
+  const r = await callPost('/cangjingge/visible', '/cangjingge/visible', JSON.stringify({ paths: [skillA, skillC], visible: false }))
+  eq(r.json.ok, true, '批量隐藏成功')
+  const raw = JSON.parse(await readFile(join(root, '_visible.json'), 'utf8'))
+  eq(raw.skills[skillA], undefined, '批量后键被删除')
+}
+
+{
+  // 批量显示（全选）
+  const r = await callPost('/cangjingge/visible', '/cangjingge/visible', JSON.stringify({ paths: [skillA, skillC], visible: true }))
+  eq(r.json.ok, true, '批量显示成功')
+  const raw = JSON.parse(await readFile(join(root, '_visible.json'), 'utf8'))
+  eq(raw.skills[skillA], true, '批量后键被写入')
+  eq(raw.skills[skillC], true, '两个文件都写入')
+}
+
+{
+  // 写操作必须挡住根目录之外的路径
+  const r = await callPost('/cangjingge/visible', '/cangjingge/visible', JSON.stringify({ path: secret, visible: true }))
+  eq(r.json.ok, false, '拒绝把藏经阁之外的文件设为可见')
+}
+
+{
+  // 批量里的越界路径被逐个跳过，但请求本身成功
+  const r = await callPost('/cangjingge/visible', '/cangjingge/visible', JSON.stringify({ paths: [skillA, secret], visible: false }))
+  eq(r.json.ok, true, '批量请求成功')
+  const raw = JSON.parse(await readFile(join(root, '_visible.json'), 'utf8'))
+  eq(raw.skills[secret], undefined, '越界路径未被写入')
+}
+
+{
+  // GET 打写路由 -> 405
+  const route = routes.find((r) => r.path === '/cangjingge/visible')
+  const res = fakeRes()
+  await route.handler(fakeReq('/cangjingge/visible', 'GET', ''), res)
+  eq(res.state.status, 405, 'GET 打 visible 路由返回 405')
+}
+
+{
+  // 跨源来源被拒（带 Origin 且与 Host 不同）
+  const route = routes.find((r) => r.path === '/cangjingge/visible')
+  const res = fakeRes()
+  const req = fakeReq('/cangjingge/visible', 'POST', JSON.stringify({ path: skillC, visible: true }))
+  req.headers = { origin: 'https://evil.example', host: 'localhost:1234' }
+  await route.handler(req, res)
+  eq(res.state.status, 403, '跨源来源被拒 403')
+}
+
+{
+  // 缺 path 且不是批量 -> ok:false
+  const r = await callPost('/cangjingge/visible', '/cangjingge/visible', JSON.stringify({ visible: true }))
+  eq(r.json.ok, false, '缺 path 返回 ok=false')
 }
 
 // ---- 设置路由（书架目录可改）--------------------------------------------------
@@ -314,7 +404,7 @@ const skillC = join(root, '兵法', '谋', 'c.md')
   let threw = false
   try { host.apply(ctx2, { libraryDir: root }) } catch { threw = true }
   eq(threw, false, 'ctx.get 拿不到服务时 apply 不抛')
-  eq(r2.length, 4, 'ctx.get 拿不到服务时路由照常注册')
+  eq(r2.length, 5, 'ctx.get 拿不到服务时路由照常注册')
 }
 
 // ---- 清理 ---------------------------------------------------------------------

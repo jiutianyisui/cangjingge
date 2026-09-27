@@ -39,6 +39,8 @@ const SHELF_URL = '/cangjingge/shelf'
 const SKILL_URL = '/cangjingge/skill'
 /** 设置读写路由（书架目录）。 */
 const SETTINGS_URL = '/cangjingge/settings'
+/** `/` 菜单可见性开关路由。 */
+const VISIBLE_URL = '/cangjingge/visible'
 /** 输入触发菜单的 source 名（与 `/` 组合成 /藏经阁）。 */
 const SOURCE_TRIGGER = '/'
 const SOURCE_NAME = 'cangjingge'
@@ -141,6 +143,23 @@ const CSS = [
   '.dsh-cjg-hint{margin-top:11px;padding:8px 11px;border-radius:9px;font-size:11px;color:var(--dsw-alias-label-secondary);background:var(--dsw-alias-bg-layer-1);border:1px dashed var(--dsh-cjg-gold-line);line-height:1.65}',
   '.dsh-cjg-kbd{display:inline-block;padding:0 5px;border-radius:5px;font-family:var(--dsw-specific-font-family-code),monospace;font-size:10.5px;color:var(--dsh-cjg-gold);border:1px solid var(--dsh-cjg-gold-line);background:var(--dsh-cjg-gold-soft)}',
 
+  // ── 「在 / 菜单显示」开关 ─────────────────────────────────────────────────
+  // 一对分段按钮（不是 checkbox）：两个状态都可见、可直选。
+  '.dsh-cjg-switch{display:inline-flex;align-items:center;gap:0;border:1px solid var(--dsw-alias-border-l2);border-radius:9px;overflow:hidden;flex:0 0 auto}',
+  '.dsh-cjg-switch-btn{border:0;background:transparent;color:var(--dsw-alias-label-secondary);font-family:inherit;font-size:11px;padding:4px 11px;cursor:pointer;transition:background .14s,color .14s}',
+  '.dsh-cjg-switch-btn:hover:not(:disabled){background:var(--dsw-alias-bg-layer-2)}',
+  '.dsh-cjg-switch-btn:disabled{opacity:.5;cursor:default}',
+  '.dsh-cjg-switch-on{background:var(--dsh-cjg-gold-soft);color:var(--dsw-alias-label-primary);font-weight:600}',
+  '.dsh-cjg-switch-btn + .dsh-cjg-switch-btn{border-left:1px solid var(--dsw-alias-border-l2)}',
+  // 列表里「已显示在 / 菜单」的小点
+  '.dsh-cjg-auto-dot{flex:0 0 auto;width:5px;height:5px;border-radius:50%;background:var(--dsh-cjg-gold);box-shadow:0 0 5px var(--dsh-cjg-gold-line)}',
+  '.dsh-cjg-mode-row{display:flex;align-items:center;gap:9px;margin-top:11px;flex-wrap:wrap}',
+  '.dsh-cjg-mode-label{font-size:11px;color:var(--dsw-alias-label-tertiary)}',
+  // 头部右侧的小按钮（全选 / 全不选）
+  '.dsh-cjg-mini{flex:0 0 auto;border:1px solid var(--dsw-alias-border-l2);background:transparent;color:var(--dsw-alias-label-secondary);font-family:inherit;font-size:10px;padding:2px 7px;border-radius:6px;cursor:pointer;transition:background .14s,color .14s}',
+  '.dsh-cjg-mini:hover:not(:disabled){background:var(--dsw-alias-bg-layer-2);color:var(--dsw-alias-label-primary)}',
+  '.dsh-cjg-mini:disabled{opacity:.45;cursor:default}',
+
   // ── 图标 ────────────────────────────────────────────────────────────────
   '.dsh-cjg-icon{display:inline-flex;align-items:center;justify-content:center;transition:transform .16s}',
   '.dsh-cjg-icon-active{color:var(--dsh-cjg-gold)}',
@@ -234,6 +253,31 @@ async function fetchSkill(path) {
     return data
   } catch (error) {
     return { ok: false, message: '读取 skill 失败：' + String(error && error.message ? error.message : error) }
+  }
+}
+
+/**
+ * 设置 skill 是否在 `/` 菜单显示（单个或批量）。
+ *
+ * 【为什么不乐观更新】界面显示的必须与 _visible.json 一致：乐观更新在写
+ * 失败时会显示一个**假**的「已显示」—— 而用户会据此以为 `/` 里真能搜到。
+ * @param payload - { path, visible } 或 { paths, visible }。
+ * @returns { ok, visible, message }。
+ */
+async function postVisible(payload) {
+  try {
+    const response = await fetch(VISIBLE_URL, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify(payload),
+    })
+    if (response.status === 403) return { ok: false, message: '宿主拒绝了这次修改（来源不被信任）。' }
+    if (!response.ok) return { ok: false, message: '宿主返回 HTTP ' + String(response.status) }
+    const data = await response.json()
+    if (data === null || typeof data !== 'object') return { ok: false, message: '宿主返回的不是 JSON 对象' }
+    return data
+  } catch (error) {
+    return { ok: false, message: String(error && error.message ? error.message : error) }
   }
 }
 
@@ -463,7 +507,7 @@ function SettingsDialog(props) {
  *   宿主没有从面板直接写 composer 的接口（见文件头注释），所以：
  *     - 「复制路径」把路径塞进剪贴板，用户可以自己粘贴；
  *     - 真正的插入引导用户去 composer 打 `/藏经阁`，那边是官方支持的正路。
- * @param props - { skill, text, loading, error, truncated, onCopy }。
+ * @param props - { skill, text, loading, error, truncated, onCopy, onVisible }。
  * @returns React 元素。
  */
 function SkillDetail(props) {
@@ -497,6 +541,29 @@ function SkillDetail(props) {
         className: 'dsh-cjg-btn dsh-cjg-btn-primary',
         onClick: () => props.onCopy(String(props.text === undefined || props.text === null ? '' : props.text)),
       }, '复制全文')),
+    // 「在 / 菜单显示」开关：书架永远显示全部，这个只决定能否从 `/` 搜到。
+    // 放在详情里（而不是列表行上）：一次只改一个文件，语义更清楚。
+    React.createElement('div', { className: 'dsh-cjg-mode-row' },
+      React.createElement('span', { className: 'dsh-cjg-mode-label' }, '/ 菜单'),
+      React.createElement('span', { className: 'dsh-cjg-switch' },
+        React.createElement('button', {
+          type: 'button',
+          className: 'dsh-cjg-switch-btn' + (props.visible !== true ? ' dsh-cjg-switch-on' : ''),
+          disabled: props.switching === true,
+          title: '打 / 时搜不到这个文件（书架里照常可见）',
+          onClick: () => props.onVisible(false),
+        }, '不显示'),
+        React.createElement('button', {
+          type: 'button',
+          className: 'dsh-cjg-switch-btn' + (props.visible === true ? ' dsh-cjg-switch-on' : ''),
+          disabled: props.switching === true,
+          title: '打 / 时能搜到这个文件',
+          onClick: () => props.onVisible(true),
+        }, '显示')),
+      React.createElement('span', { className: 'dsh-cjg-mode-label' },
+        props.visible === true
+          ? '打 / 时能搜到'
+          : '打 / 时搜不到（书架里仍在）')),
     React.createElement('div', { className: 'dsh-cjg-hint' },
       '在聊天输入框里打 ',
       React.createElement('span', { className: 'dsh-cjg-kbd' }, '/'),
@@ -518,8 +585,11 @@ function ShelfPanel() {
   const [selection, setSelection] = React.useState({ group: null, item: null })
   const [detail, setDetail] = React.useState({
     skill: null, text: '', loading: false, error: null, truncated: false,
+    visible: false, switching: false,
   })
   const [flash, setFlash] = React.useState(null)
+  /** 批量勾选（全选/全不选）进行中。 */
+  const [bulkBusy, setBulkBusy] = React.useState(false)
   /** 设置弹窗：null = 关闭；否则是当前设置信息。 */
   const [settingsOpen, setSettingsOpen] = React.useState(null)
   const [savingSettings, setSavingSettings] = React.useState(false)
@@ -560,7 +630,8 @@ function ShelfPanel() {
 
   // 选中 skill -> 拉正文
   const openSkill = React.useCallback(async (skill) => {
-    setDetail({ skill, text: '', loading: true, error: null, truncated: false })
+    const visible = skill !== null && skill !== undefined && skill.visible === true
+    setDetail({ skill, text: '', loading: true, error: null, truncated: false, visible, switching: false })
     setFlash(null)
     const result = await fetchSkill(skill.path)
     if (!alive.current) return
@@ -568,12 +639,13 @@ function ShelfPanel() {
       setDetail({
         skill, text: String(result.text === undefined ? '' : result.text),
         loading: false, error: null, truncated: result.truncated === true,
+        visible, switching: false,
       })
     } else {
       setDetail({
         skill, text: '', loading: false,
         error: result !== null && typeof result.message === 'string' ? result.message : '读取失败。',
-        truncated: false,
+        truncated: false, visible, switching: false,
       })
     }
   }, [])
@@ -582,7 +654,7 @@ function ShelfPanel() {
   const pickGroup = React.useCallback((name) => {
     selectionRef.current = { group: name, item: null }
     setSelection(selectionRef.current)
-    setDetail({ skill: null, text: '', loading: false, error: null, truncated: false })
+    setDetail({ skill: null, text: '', loading: false, error: null, truncated: false, visible: false, switching: false })
     void load(name, null)
   }, [load])
 
@@ -590,9 +662,88 @@ function ShelfPanel() {
     const group = selectionRef.current.group
     selectionRef.current = { group, item: name }
     setSelection(selectionRef.current)
-    setDetail({ skill: null, text: '', loading: false, error: null, truncated: false })
+    setDetail({ skill: null, text: '', loading: false, error: null, truncated: false, visible: false, switching: false })
     void load(group, name)
   }, [load])
+
+  /**
+   * 切换当前 skill 是否在 `/` 菜单显示。
+   *
+   * 【不乐观更新】见 postVisible 的说明：写失败时显示假状态最误导人。
+   * 写成功后重扫一次，让列表里的小圆点与头部统计跟上。
+   */
+  const switchVisible = React.useCallback(async (next) => {
+    const skill = detail.skill
+    if (skill === null || skill === undefined) return
+    setDetail((prev) => ({ ...prev, switching: true }))
+    setFlash(null)
+    const result = await postVisible({ path: skill.path, visible: next })
+    if (!alive.current) return
+    if (result !== null && result.ok === true) {
+      setDetail((prev) => ({ ...prev, visible: result.visible === true, switching: false }))
+      setFlash({
+        kind: 'ok',
+        text: result.visible === true
+          ? '已显示：打 / 时能搜到这个文件。'
+          : '已隐藏：打 / 时搜不到它（书架里仍在）。',
+      })
+      void load(selectionRef.current.group, selectionRef.current.item)
+    } else {
+      setDetail((prev) => ({ ...prev, switching: false }))
+      setFlash({ kind: 'error', text: '切换失败：' + String(result === null ? '宿主无响应' : result.message) })
+    }
+  }, [detail.skill, load])
+
+  /**
+   * 全选 / 全不选：把整棵书架（或只当前子项）的所有 skill 一次设成同一个可见性。
+   *
+   * 【为什么需要】默认是「全不显示」，第一次用要逐个勾几十次 —— 这一步是
+   * 让新用户能一分钟内把常用项放出来，而不是先跟界面搏斗。
+   * @param visible - true = 全部显示，false = 全部隐藏。
+   * @param scope - 'item' = 只当前子项；'all' = 整座书架。
+   */
+  const bulkVisible = React.useCallback(async (visible, scope) => {
+    setBulkBusy(true)
+    setFlash(null)
+    let paths = []
+    if (scope === 'item') {
+      const view = state.data !== null && state.data.view !== undefined ? state.data.view : null
+      const skills = view !== null && Array.isArray(view.skills) ? view.skills : []
+      paths = skills.map((s) => s.path)
+    } else {
+      // 整座书架：需要逐子项拉一次（与 `/` 菜单的遍历同一代价，且只在这一下发生）
+      const data = state.data !== null && state.data !== undefined ? state.data : null
+      const groups = data !== null && Array.isArray(data.groups) ? data.groups : []
+      for (const group of groups) {
+        const items = Array.isArray(group.items) ? group.items : []
+        for (const item of items) {
+          const one = await fetchShelf(group.name, item.name)
+          if (one === null || one.ok !== true) continue
+          const view = one.view !== null && one.view !== undefined ? one.view : null
+          const skills = view !== null && Array.isArray(view.skills) ? view.skills : []
+          for (const s of skills) paths.push(s.path)
+        }
+      }
+    }
+    if (paths.length === 0) {
+      setBulkBusy(false)
+      setFlash({ kind: 'error', text: '没有可切换的文件。' })
+      return
+    }
+    const result = await postVisible({ paths, visible })
+    if (!alive.current) return
+    setBulkBusy(false)
+    if (result !== null && result.ok === true) {
+      setFlash({
+        kind: 'ok',
+        text: '已' + (visible ? '全部显示' : '全部隐藏') + '（' + String(paths.length) + ' 个文件）。',
+      })
+      setDetail((prev) => ({ ...prev, visible }))
+      void load(selectionRef.current.group, selectionRef.current.item)
+    } else {
+      setFlash({ kind: 'error', text: '批量切换失败：' + String(result === null ? '宿主无响应' : result.message) })
+    }
+  }, [state.data, load])
 
   /**
    * 打开设置弹窗（先拉当前设置，让输入框有正确的初值）。
@@ -623,7 +774,7 @@ function ShelfPanel() {
       // 目录变了：清掉右侧详情（它属于旧目录），并重扫
       selectionRef.current = { group: null, item: null }
       setSelection(selectionRef.current)
-      setDetail({ skill: null, text: '', loading: false, error: null, truncated: false })
+      setDetail({ skill: null, text: '', loading: false, error: null, truncated: false, visible: false, switching: false })
       setFlash({
         kind: 'ok',
         text: result.saved === true
@@ -679,6 +830,18 @@ function ShelfPanel() {
       React.createElement('span', { className: 'dsh-cjg-spacer' }),
       React.createElement('button', {
         type: 'button', className: 'dsh-cjg-btn',
+        title: '把整座书架的所有 skill 设为「在 / 菜单显示」',
+        disabled: bulkBusy,
+        onClick: () => { void bulkVisible(true, 'all') },
+      }, bulkBusy ? '处理中…' : '全部显示'),
+      React.createElement('button', {
+        type: 'button', className: 'dsh-cjg-btn',
+        title: '把整座书架的所有 skill 设为「不在 / 菜单显示」（书架里仍在）',
+        disabled: bulkBusy,
+        onClick: () => { void bulkVisible(false, 'all') },
+      }, '全部隐藏'),
+      React.createElement('button', {
+        type: 'button', className: 'dsh-cjg-btn',
         title: '更改书架根目录',
         onClick: () => { void openSettings() },
       }, '设置'),
@@ -726,7 +889,10 @@ function ShelfPanel() {
                     onClick: () => { void openSkill(skill) },
                   },
                   React.createElement('span', { className: 'dsh-cjg-ico' }, React.createElement(FileGlyph, null)),
-                  React.createElement('span', { className: 'dsh-cjg-row-name' }, skill.name))
+                  React.createElement('span', { className: 'dsh-cjg-row-name' }, skill.name),
+                  skill.visible === true
+                    ? React.createElement('span', { className: 'dsh-cjg-auto-dot', title: '在 / 菜单显示' })
+                    : null)
                 })),
             React.createElement('div', { className: 'dsh-cjg-body' },
               flash === null ? null : React.createElement('div', {
@@ -735,6 +901,8 @@ function ShelfPanel() {
               React.createElement(SkillDetail, {
                 skill: detail.skill, text: detail.text, loading: detail.loading,
                 error: detail.error, truncated: detail.truncated, onCopy: copy,
+                visible: detail.visible, switching: detail.switching,
+                onVisible: (next) => { void switchVisible(next) },
               })))),
     settingsOpen === null ? null : React.createElement(SettingsDialog, {
       info: settingsOpen,
@@ -776,8 +944,12 @@ function makeSource(rootCtx) {
     /**
      * 列出候选。
      *
-     * 不带 query 时列出**全部**分组/子项下的 skill（面包屑形式的名字），
-     * 让用户打 `/` 就能直接翻整座书架；带 query 时按名字过滤。
+     * 【两段式】空 query 只给「分组行」—— 书架大起来时把上百个 skill 全铺出来
+     *   会刷屏，第一屏给分组名就够（且只有含已勾选 skill 的组会出现）。
+     *   带 query 时展开 skill 行，按「分组 / 子项 / 文件名」面包屑过滤。
+     *
+     * 【只列已勾选的】哪些 skill 能被搜到由书架的「在 / 菜单显示」开关决定
+     *   （宿主侧 /cangjingge/candidates 已过滤，这里拿到的就是可用的）。
      * @param session - { sessionId }。
      * @param req - { query, signal }。
      * @returns 候选行数组。
@@ -787,6 +959,12 @@ function makeSource(rootCtx) {
       const data = await fetchShelf(null, null)
       if (data === null || data.ok !== true) return []
       const groups = data.groups !== undefined && Array.isArray(data.groups) ? data.groups : []
+
+      // 第一屏：只有分组名，且该组下得有计划可插入的 skill。
+      if (query.trim().length === 0) {
+        return groupCandidates(groups).slice(0, 200)
+      }
+
       const rows = []
       for (const group of groups) {
         const items = Array.isArray(group.items) ? group.items : []
@@ -810,12 +988,8 @@ function makeSource(rootCtx) {
           }
         }
       }
-      const lowered = query.toLowerCase()
-      const filtered = lowered.length === 0
-        ? rows
-        : rows.filter((row) => row.name.toLowerCase().includes(lowered))
       // 上限：菜单是给人挑的，几百行没意义
-      return filtered.slice(0, 200)
+      return filterCandidates(rows, query).slice(0, 200)
     },
     /**
      * pick 回调：返回插入指令。
@@ -908,5 +1082,5 @@ exports.inject = ['slots', 'inputTriggers']
 exports.__view = { ShelfPanel, PanelIcon, Column, SkillDetail, SettingsDialog, FolderGlyph, FileGlyph }
 exports.__const = {
   CSS, ICON_SLOT, MAIN_SLOT, PANEL_ID, SOURCE_TRIGGER, SOURCE_NAME,
-  SHELF_URL, SKILL_URL, SETTINGS_URL,
+  SHELF_URL, SKILL_URL, SETTINGS_URL, VISIBLE_URL,
 }
