@@ -14,7 +14,6 @@ import {
   skillInsertText,
   skillCandidates,
   parseCandidateValue,
-  groupCandidates,
   filterCandidates,
   VISIBLE_FILE_NAME,
   normalizeVisible,
@@ -188,20 +187,7 @@ eq(normalizeVisible({ skills: [] }).skills, {}, 'skills 是数组 -> 空')
   eq(visibleSkills(s), ['/a.md', '/b.md'], '可见清单已排序')
 }
 
-// ---- 候选行的两段式（分组行 + 关键词过滤）---------------------------------------
-{
-  eq(groupCandidates(null), [], 'null -> 空')
-  const rows = groupCandidates([
-    { name: '有声', visibleCount: 3 },
-    { name: '空的', visibleCount: 0 },
-    { name: '', visibleCount: 5 },
-  ])
-  eq(rows.length, 1, '只列有可见项的分组')
-  eq(rows[0].name, '有声', '分组名正确')
-  eq(rows[0].section, '分组', 'section 标记为分组')
-  eq(JSON.parse(rows[0].value).kind, 'group', 'value 是可解析的分组引用')
-}
-
+// ---- 候选行的关键词过滤 --------------------------------------------------------
 {
   const rows = [
     { name: '团队 / 编制 / 规程.md', description: '/a/团队/编制/规程.md' },

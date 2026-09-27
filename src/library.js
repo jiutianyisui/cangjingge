@@ -273,42 +273,9 @@ export function parseCandidateValue(value) {
 }
 
 /**
- * 由整棵树拼出「分组行」候选（`/` 菜单的**第一屏**）。
- *
- * 【为什么只要分组】
- *   书架大起来时，空 query 直接把所有 skill 铺出来会刷屏。第一屏只给分组名，
- *   用户打了关键词再由调用方过滤 —— 这是输入触发菜单的常规用法。
- *
- * 【只列有内容的组】`/` 菜单点进去是要选 skill 的，空分组点了没意义，
- *   所以 count 为 0（或所有 skill 都未勾选）的分组不出现。
- *
- * @param groups - [{ name, visibleCount }]（visibleCount = 组内已勾选的 skill 数）。
- * @returns 候选行数组（section = '分组'）。
- */
-export function groupCandidates(groups) {
-  const list = Array.isArray(groups) ? groups : []
-  const out = []
-  for (const group of list) {
-    if (group === null || typeof group !== 'object') continue
-    const name = typeof group.name === 'string' ? group.name : ''
-    if (name.length === 0) continue
-    if (!(typeof group.visibleCount === 'number' && group.visibleCount > 0)) continue
-    out.push({
-      name,
-      description: String(group.visibleCount) + ' 个可插入',
-      icon: 'folder',
-      section: '分组',
-      value: JSON.stringify({ kind: 'group', name }),
-    })
-  }
-  return out
-}
-
-/**
  * 按关键词过滤候选行（大小写不敏感，命中 name 或 description）。
  *
- * 空关键词返回全部 —— 「空 query 走分组行、非空走 skill 行」的分流由调用方
- * 决定，本函数只管过滤这一件事。
+ * 空关键词返回全部 —— DSH 的输入触发菜单会把用户输入当 query 传进来。
  *
  * @param rows - 候选行数组。
  * @param query - 关键词。

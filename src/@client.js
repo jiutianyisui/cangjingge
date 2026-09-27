@@ -151,8 +151,11 @@ const CSS = [
   '.dsh-cjg-switch-btn:disabled{opacity:.5;cursor:default}',
   '.dsh-cjg-switch-on{background:var(--dsh-cjg-gold-soft);color:var(--dsw-alias-label-primary);font-weight:600}',
   '.dsh-cjg-switch-btn + .dsh-cjg-switch-btn{border-left:1px solid var(--dsw-alias-border-l2)}',
-  // 列表里「已显示在 / 菜单」的小点
-  '.dsh-cjg-auto-dot{flex:0 0 auto;width:5px;height:5px;border-radius:50%;background:var(--dsh-cjg-gold);box-shadow:0 0 5px var(--dsh-cjg-gold-line)}',
+  // 列表里「已在 / 菜单显示」的标记：做成金色胶囊徽标（原来只有 5px 小点，容易看漏）
+  '.dsh-cjg-auto-dot{flex:0 0 auto;display:inline-flex;align-items:center;justify-content:center;height:15px;padding:0 6px;border-radius:999px;font-size:9.5px;font-weight:600;letter-spacing:.02em;background:var(--dsh-cjg-gold-soft);color:var(--dsh-cjg-gold);border:1px solid var(--dsh-cjg-gold-line)}',
+  // 未显示的行整行压暗一档，让「已显示」的项一眼可见
+  '.dsh-cjg-row-hidden .dsh-cjg-row-name{color:var(--dsw-alias-label-tertiary)}',
+  '.dsh-cjg-row-hidden .dsh-cjg-ico{opacity:.35}',
   '.dsh-cjg-mode-row{display:flex;align-items:center;gap:9px;margin-top:11px;flex-wrap:wrap}',
   '.dsh-cjg-mode-label{font-size:11px;color:var(--dsw-alias-label-tertiary)}',
   // 头部右侧的小按钮（全选 / 全不选）
@@ -881,17 +884,18 @@ function ShelfPanel() {
                   '这个子项下还没有 skill 文件（支持 .md / .markdown / .txt）。')
                 : skills.map((skill) => {
                   const on = detail.skill !== null && detail.skill !== undefined && detail.skill.path === skill.path
+                  const shown = skill.visible === true
                   return React.createElement('button', {
                     key: skill.path,
                     type: 'button',
-                    className: 'dsh-cjg-row' + (on ? ' dsh-cjg-row-on' : ''),
-                    title: skill.name,
+                    className: 'dsh-cjg-row' + (on ? ' dsh-cjg-row-on' : '') + (shown ? '' : ' dsh-cjg-row-hidden'),
+                    title: shown ? skill.name + '（已在 / 菜单显示）' : skill.name + '（不在 / 菜单显示）',
                     onClick: () => { void openSkill(skill) },
                   },
                   React.createElement('span', { className: 'dsh-cjg-ico' }, React.createElement(FileGlyph, null)),
                   React.createElement('span', { className: 'dsh-cjg-row-name' }, skill.name),
-                  skill.visible === true
-                    ? React.createElement('span', { className: 'dsh-cjg-auto-dot', title: '在 / 菜单显示' })
+                  shown
+                    ? React.createElement('span', { className: 'dsh-cjg-auto-dot' }, '✓ /')
                     : null)
                 })),
             React.createElement('div', { className: 'dsh-cjg-body' },
@@ -942,14 +946,14 @@ function makeSource(rootCtx) {
     name: SOURCE_NAME,
     showGroupTitle: true,
     /**
-     * 列出候选。
+     * 列出候选：**所有已在 `/` 菜单显示的 skill**（面包屑形式的名字）。
      *
-     * 【两段式】空 query 只给「分组行」—— 书架大起来时把上百个 skill 全铺出来
-     *   会刷屏，第一屏给分组名就够（且只有含已勾选 skill 的组会出现）。
-     *   带 query 时展开 skill 行，按「分组 / 子项 / 文件名」面包屑过滤。
+     * 【为什么不是空 query 只给分组】曾做过「第一屏只列分组、打字才展开」的
+     *   两段式，但输入触发菜单没有二级下钻，体验反而绕。现在直接列全部已勾选项
+     *   —— 数量由书架的「在 / 菜单显示」开关控制住。
      *
-     * 【只列已勾选的】哪些 skill 能被搜到由书架的「在 / 菜单显示」开关决定
-     *   （宿主侧 /cangjingge/candidates 已过滤，这里拿到的就是可用的）。
+     * 【只列已勾选的】宿主侧 /cangjingge/candidates 已按 _visible.json 过滤，
+     *   这里拿到的就是可用的。
      * @param session - { sessionId }。
      * @param req - { query, signal }。
      * @returns 候选行数组。
@@ -959,11 +963,6 @@ function makeSource(rootCtx) {
       const data = await fetchShelf(null, null)
       if (data === null || data.ok !== true) return []
       const groups = data.groups !== undefined && Array.isArray(data.groups) ? data.groups : []
-
-      // 第一屏：只有分组名，且该组下得有计划可插入的 skill。
-      if (query.trim().length === 0) {
-        return groupCandidates(groups).slice(0, 200)
-      }
 
       const rows = []
       for (const group of groups) {
