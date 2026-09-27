@@ -32,6 +32,13 @@ const root = await mkdtemp(join(tmpdir(), 'cjg-e2e-'))
 await mkdir(join(root, '经部', '易'), { recursive: true })
 await writeFile(join(root, '经部', '易', '系辞.md'), '# 系辞\n原文……\n', 'utf8')
 
+// 【测试隔离】把设置文件重定向到临时路径（必须在 host.apply **之前**设）——
+// 否则会读到用户真实的 ~/.dsh/cangjingge-settings.json，它的优先级**高于**
+// 下面传的 libraryDir 参数，会让本测试扫到真实书架而不是这里造的临时书架。
+const settingsFile = join(tmpdir(), 'cjg-e2e-settings-' + String(process.pid) + '.json')
+process.env.DSH_CANGJINGGE_SETTINGS = settingsFile
+await rm(settingsFile, { force: true })
+
 // 装载宿主半，收集路由
 const routes = []
 const ctx = {

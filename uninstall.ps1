@@ -9,6 +9,8 @@ param(
 
 $ErrorActionPreference = 'Stop'
 $root = Split-Path -Parent $MyInvocation.MyCommand.Path
+# 引入共享的 patch 安全编辑库（逐行扫描，拒绝静默破坏）
+. (Join-Path $root 'patch-lib.ps1')
 $pkgName = (Get-Content (Join-Path $root 'package.json') -Raw -Encoding utf8 | ConvertFrom-Json).name
 $profileDir = Join-Path $env:USERPROFILE ('.dsh\profiles\' + $Profile)
 if (-not (Test-Path $profileDir)) { throw ('profile 不存在：' + $profileDir) }
@@ -52,15 +54,21 @@ if (Test-Path $profilePkgPath) {
 # 安装时写的是 `# >>> dsh-cangjingge` / `# <<< dsh-cangjingge` 成对标记块。
 # 不清掉的话，卸载后 patch 里会留一段指向本插件的孤儿配置 ——
 # 下次装回来时会因为「已有 libraryDir」而沿用旧值，看起来正常但很脏。
+#
+# 【用共享库逐行扫描，不用正则跨行替换】
+#   正则版 (`(?s)` + `.*?`) 在块边界不干净时会吞掉**别人的条目** ——
+#   真实事故：把 profile patch 里的 agent-loop 条目夹进块内一起删了。
+#   Remove-CangjinggeBlock 只删自己认得的行，遇到不认识的条目就抛错拒绝
+#   （宁可中止，也不破坏用户的配置）。见 patch-lib.ps1。
 $patchPath = Join-Path $profileDir 'cordis.patch.yml'
 if (Test-Path $patchPath) {
   $patch = Get-Content $patchPath -Raw -Encoding utf8
-  $begin = '# >>> dsh-cangjingge'
-  $end = '# <<< dsh-cangjingge'
-  $own = [regex]::Escape($begin) + '(?s).*?' + [regex]::Escape($end) + '\r?\n?'
-  $cleaned = [regex]::Replace($patch, $own, '').TrimEnd() + [char]10
-  if ($cleaned -ne $patch) {
-    [IO.File]::WriteAllText($patchPath, $cleaned, (New-Object System.Text.UTF8Encoding($false)))
+  $bak = Backup-PatchFile -PatchPath $patchPath
+  if ($null -ne $bak) { Write-Host ('backup: ' + $bak) }
+
+  $result = Remove-CangjinggeBlock -PatchText $patch -PatchPath $patchPath
+  if ($result.Found) {
+    [IO.File]::WriteAllText($patchPath, $result.Text + [char]10, (New-Object System.Text.UTF8Encoding($false)))
     Write-Host 'cleaned: cordis.patch.yml 里的 dsh-cangjingge 配置段已移除'
   } else {
     Write-Host 'cleaned: cordis.patch.yml 里没有本插件的配置段，跳过'

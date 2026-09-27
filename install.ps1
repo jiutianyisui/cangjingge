@@ -26,6 +26,8 @@ param(
 
 $ErrorActionPreference = 'Stop'
 $root = Split-Path -Parent $MyInvocation.MyCommand.Path
+# 引入共享的 patch 安全编辑库（逐行扫描，拒绝静默破坏）
+. (Join-Path $root 'patch-lib.ps1')
 $pkgName = (Get-Content (Join-Path $root 'package.json') -Raw -Encoding utf8 | ConvertFrom-Json).name
 $profileDir = Join-Path $env:USERPROFILE ('.dsh\profiles\' + $Profile)
 if (-not (Test-Path $profileDir)) { throw ('profile 不存在：' + $profileDir) }
@@ -100,26 +102,48 @@ if ($bundles -contains $pkgName) {
 
 # ---- 3) 书架目录 + 把 libraryDir 写进 profile patch ---------------------------
 #
-# 【为什么必须写进 patch】
-#   插件默认扫 ~/.dsh/cangjingge。如果用户的书架空在别处（很常见），
-#   不写这条配置，界面就是**空的而且不报错** —— 这类"静默为空"最难查。
-#   所以安装脚本负责把配置一并落位，而不是留给用户手改。
+# 【配置的真实优先级 —— 与插件内部一致】
+#   界面设置(settings 文件) > 插件配置(patch 里的 libraryDir) > 内置默认
 #
-# 目录优先级：
+#   所以：**用户若已在界面里设过目录，就不该再往 patch 写** ——
+#   写了也永远被界面值盖住，只会变成一条看不懂的"僵尸配置"，
+#   下次有人手改它却毫无效果，更难查。
+#
+# 本脚本取值顺序：
 #   1) -LibraryDir 参数（显式指定）
-#   2) 已存在于 patch 里的 libraryDir（不覆盖用户已有的设置）
-#   3) ~/.dsh/cangjingge（与原 defaultLibraryDir() 一致，通用位置）
+#   2) settings 文件里已有的值（界面设过的）→ **不写 patch**
+#   3) patch 里已有的 libraryDir（沿用）
+#   4) ~/.dsh/cangjingge（与插件内置默认一致）
 $patchPath = Join-Path $profileDir 'cordis.patch.yml'
 $patchText = ''
 if (Test-Path $patchPath) { $patchText = Get-Content $patchPath -Raw -Encoding utf8 }
 
+# 界面设置文件（插件读的那个）
+$settingsPath = Join-Path $env:USERPROFILE '.dsh\cangjingge-settings.json'
+$settingsDir = $null
+if (Test-Path $settingsPath) {
+  try {
+    $parsed = Get-Content $settingsPath -Raw -Encoding utf8 | ConvertFrom-Json
+    if ($null -ne $parsed.libraryDir -and -not [string]::IsNullOrWhiteSpace($parsed.libraryDir)) {
+      $settingsDir = $parsed.libraryDir
+    }
+  } catch { Write-Host ('warn: 设置文件解析失败，忽略：' + $settingsPath) }
+}
+
 $libDir = $LibraryDir
-if ([string]::IsNullOrWhiteSpace($libDir)) {
-  # 已有配置就沿用，不覆盖
+$skipPatchWrite = $false
+
+if ([string]::IsNullOrWhiteSpace($libDir) -and $null -ne $settingsDir) {
+  # 界面已经设过了：沿用，且不写 patch
+  $libDir = $settingsDir
+  $skipPatchWrite = $true
+  Write-Host ('libraryDir: 界面设置已指定 ' + $libDir + '（不改 patch）')
+} elseif ([string]::IsNullOrWhiteSpace($libDir)) {
+  # 没有显式参数、界面也没设：看 patch 里有没有
   $existing = [regex]::Match($patchText, "(?m)^\s*libraryDir:\s*'?([^'\r\n]+)'?\s*$")
   if ($existing.Success) {
     $libDir = $existing.Groups[1].Value.Trim()
-    Write-Host ('libraryDir: 沿用已有配置 ' + $libDir)
+    Write-Host ('libraryDir: 沿用 patch 里已有的配置 ' + $libDir)
   } else {
     $libDir = Join-Path $env:USERPROFILE '.dsh\cangjingge'
   }
@@ -131,24 +155,59 @@ if (-not (Test-Path $libDir)) {
   Write-Host ('created: ' + $libDir)
 }
 
-# 写/更新 patch 里的本插件行（先删旧段再追加，保证幂等且不重复）
-$begin = '# >>> dsh-cangjingge'
-$end = '# <<< dsh-cangjingge'
-$own = [regex]::Escape($begin) + '(?s).*?' + [regex]::Escape($end) + '\r?\n?'
-$cleaned = [regex]::Replace($patchText, $own, '').TrimEnd()
-$block = @(
-  $begin
-  '- id: dsh-cangjingge'
-  '  name: dsh-cangjingge'
-  '  config:'
-  ("    libraryDir: '" + $libDir + "'")
-  $end
-) -join [char]10
-$utf8NoBom = New-Object System.Text.UTF8Encoding($false)
-[IO.File]::WriteAllText($patchPath, $cleaned + [char]10 + [char]10 + $block + [char]10, $utf8NoBom)
-Write-Host ('configured: libraryDir = ' + $libDir)
-Write-Host ('书架目录：' + $libDir)
-Write-Host '  结构：分组文件夹 / 子文件夹 / skill 文件(.md/.markdown/.txt)'
+# 写/更新 patch 里的本插件行。
+#
+# 【为什么先摘后追加，而不用正则跨行替换 —— 真实事故】
+#   早先用 `(?s)` + `.*?` 的正则删块，会把夹在块里的、**别人的条目**一起吞掉，
+#   写坏整个 profile（所有插件配置失效，藏经阁加载失败）。
+#   现在改成 Remove-CangjinggeBlock：逐行扫描，只删自己认得的行，
+#   遇到不认识的条目就**抛错拒绝执行**，绝不静默破坏。见 patch-lib.ps1。
+# （$patchPath / $patchText 已在上面的「读已有 libraryDir」那段取好，这里不重复取）
+
+if ($skipPatchWrite) {
+  # 界面设置已指定目录（优先级更高）：
+  #   * 若 patch 里有旧块，清掉它（避免"僵尸配置"误导后来人）
+  #   * 然后**不写新块**
+  if (Test-Path $patchPath) {
+    $bak = Backup-PatchFile -PatchPath $patchPath
+    if ($null -ne $bak) { Write-Host ('backup: ' + $bak) }
+    $rm = Remove-CangjinggeBlock -PatchText $patchText -PatchPath $patchPath
+    if ($rm.Found) {
+      [IO.File]::WriteAllText($patchPath, $rm.Text + [char]10, (New-Object System.Text.UTF8Encoding($false)))
+      Write-Host 'cleaned: 已移除 patch 里的旧 dsh-cangjingge 块（目录改由界面设置管理）'
+    } else {
+      Write-Host 'patch: 无本插件配置块，保持不动'
+    }
+  }
+  Write-Host ('书架目录（界面设置）：' + $libDir)
+  Write-Host '  想改：在藏经阁面板右上角点「设置」'
+} else {
+  if (Test-Path $patchPath) {
+    $bak = Backup-PatchFile -PatchPath $patchPath
+    if ($null -ne $bak) { Write-Host ('backup: ' + $bak) }
+  }
+
+  $removed = Remove-CangjinggeBlock -PatchText $patchText -PatchPath $patchPath
+  $cleaned = $removed.Text
+  if ($removed.Found) { Write-Host 'cleaned: 已摘掉旧的 dsh-cangjingge 块' }
+
+  $block = @(
+    $CjgBegin
+    '- id: dsh-cangjingge'
+    '  name: dsh-cangjingge'
+    '  config:'
+    ("    libraryDir: '" + $libDir + "'")
+    $CjgEnd
+  ) -join [char]10
+
+  $utf8NoBom = New-Object System.Text.UTF8Encoding($false)
+  $finalText = if ([string]::IsNullOrWhiteSpace($cleaned)) { $block } else { $cleaned + [char]10 + [char]10 + $block }
+  [IO.File]::WriteAllText($patchPath, $finalText + [char]10, $utf8NoBom)
+  Write-Host ('configured: libraryDir = ' + $libDir + '  ->  cordis.patch.yml')
+  Write-Host ('书架目录：' + $libDir)
+  Write-Host '  结构：分组文件夹 / 子文件夹 / skill 文件(.md/.markdown/.txt)'
+  Write-Host '  想改：在藏经阁面板点「设置」（会优先于本配置）'
+}
 
 Write-Host ''
 Write-Host '装好了。现在：'
