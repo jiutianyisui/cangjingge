@@ -37,6 +37,8 @@ const MAIN_SLOT = 'main'
 const SHELF_URL = '/cangjingge/shelf'
 /** 单个 skill 正文路由。 */
 const SKILL_URL = '/cangjingge/skill'
+/** 自动/手动开关路由。 */
+const MODE_URL = '/cangjingge/mode'
 /** 输入触发菜单的 source 名（与 `/` 组合成 /藏经阁）。 */
 const SOURCE_TRIGGER = '/'
 const SOURCE_NAME = 'cangjingge'
@@ -139,6 +141,20 @@ const CSS = [
   '.dsh-cjg-hint{margin-top:11px;padding:8px 11px;border-radius:9px;font-size:11px;color:var(--dsw-alias-label-secondary);background:var(--dsw-alias-bg-layer-1);border:1px dashed var(--dsh-cjg-gold-line);line-height:1.65}',
   '.dsh-cjg-kbd{display:inline-block;padding:0 5px;border-radius:5px;font-family:var(--dsw-specific-font-family-code),monospace;font-size:10.5px;color:var(--dsh-cjg-gold);border:1px solid var(--dsh-cjg-gold-line);background:var(--dsh-cjg-gold-soft)}',
 
+  // ── 自动 / 手动开关 ─────────────────────────────────────────────────────
+  // 做成一对分段按钮（不是 checkbox）：两个状态都可见、可直选，
+  // 比「勾选框 + 要靠取消来回到手动」少一步操作。
+  '.dsh-cjg-switch{ display:inline-flex;align-items:center;gap:0;border:1px solid var(--dsw-alias-border-l2);border-radius:9px;overflow:hidden;flex:0 0 auto}',
+  '.dsh-cjg-switch-btn{border:0;background:transparent;color:var(--dsw-alias-label-secondary);font-family:inherit;font-size:11px;padding:4px 11px;cursor:pointer;transition:background .14s,color .14s}',
+  '.dsh-cjg-switch-btn:hover:not(:disabled){background:var(--dsw-alias-bg-layer-2)}',
+  '.dsh-cjg-switch-btn:disabled{opacity:.5;cursor:default}',
+  '.dsh-cjg-switch-on{background:var(--dsh-cjg-gold-soft);color:var(--dsw-alias-label-primary);font-weight:600}',
+  '.dsh-cjg-switch-btn + .dsh-cjg-switch-btn{border-left:1px solid var(--dsw-alias-border-l2)}',
+  // 列表里「自动」标记：小点，避免每个自动项都占一个字宽
+  '.dsh-cjg-auto-dot{flex:0 0 auto;width:5px;height:5px;border-radius:50%;background:var(--dsh-cjg-gold);box-shadow:0 0 5px var(--dsh-cjg-gold-line)}',
+  '.dsh-cjg-mode-row{display:flex;align-items:center;gap:9px;margin-top:11px;flex-wrap:wrap}',
+  '.dsh-cjg-mode-label{font-size:11px;color:var(--dsw-alias-label-tertiary)}',
+
   // ── 图标 ────────────────────────────────────────────────────────────────
   '.dsh-cjg-icon{display:inline-flex;align-items:center;justify-content:center;transition:transform .16s}',
   '.dsh-cjg-icon-active{color:var(--dsh-cjg-gold)}',
@@ -230,9 +246,29 @@ async function fetchSkill(path) {
 }
 
 /**
- * 判断当前宿主是否已打开某个会话（决定 `/` 菜单能不能用）。
- * 不做探测：input-trigger 的 source 只在 composer 里被调用，天然有会话。
+ * 切换某个 skill 的「自动 / 手动」。
+ *
+ * 只改 _state.json 里的一条记录，不碰 skill 文件本身。
+ * @param path - skill 文件绝对路径。
+ * @param mode - 'auto' | 'manual'。
+ * @returns { ok, mode, auto, message }。
  */
+async function postMode(path, mode) {
+  try {
+    const response = await fetch(MODE_URL, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ path, mode }),
+    })
+    if (response.status === 403) return { ok: false, message: '宿主拒绝了这次修改（来源不被信任）。' }
+    if (!response.ok) return { ok: false, message: '宿主返回 HTTP ' + String(response.status) }
+    const data = await response.json()
+    if (data === null || typeof data !== 'object') return { ok: false, message: '宿主返回的不是 JSON 对象' }
+    return data
+  } catch (error) {
+    return { ok: false, message: String(error && error.message ? error.message : error) }
+  }
+}
 
 // ===========================================================================
 // 小组件
@@ -394,6 +430,26 @@ function SkillDetail(props) {
         className: 'dsh-cjg-btn dsh-cjg-btn-primary',
         onClick: () => props.onCopy(String(props.text === undefined || props.text === null ? '' : props.text)),
       }, '复制全文')),
+    React.createElement('div', { className: 'dsh-cjg-mode-row' },
+      React.createElement('span', { className: 'dsh-cjg-mode-label' }, '加载方式'),
+      React.createElement('span', { className: 'dsh-cjg-switch' },
+        React.createElement('button', {
+          type: 'button',
+          className: 'dsh-cjg-switch-btn' + (props.mode !== 'auto' ? ' dsh-cjg-switch-on' : ''),
+          disabled: props.switching === true,
+          title: '需要时由你手动取用（默认）',
+          onClick: () => props.onMode('manual'),
+        }, '手动'),
+        React.createElement('button', {
+          type: 'button',
+          className: 'dsh-cjg-switch-btn' + (props.mode === 'auto' ? ' dsh-cjg-switch-on' : ''),
+          disabled: props.switching === true,
+          title: 'Lead 每轮会话开头主动读这个 skill',
+          onClick: () => props.onMode('auto'),
+        }, '自动')),
+      props.mode === 'auto'
+        ? React.createElement('span', { className: 'dsh-cjg-mode-label' }, '已标记为自动：会话开头会被读取')
+        : null),
     React.createElement('div', { className: 'dsh-cjg-hint' },
       '在聊天输入框里打 ',
       React.createElement('span', { className: 'dsh-cjg-kbd' }, '/'),
@@ -413,7 +469,10 @@ function SkillDetail(props) {
 function ShelfPanel() {
   const [state, setState] = React.useState({ loading: true, data: null, error: null })
   const [selection, setSelection] = React.useState({ group: null, item: null })
-  const [detail, setDetail] = React.useState({ skill: null, text: '', loading: false, error: null, truncated: false })
+  const [detail, setDetail] = React.useState({
+    skill: null, text: '', loading: false, error: null, truncated: false,
+    mode: 'manual', switching: false,
+  })
   const [flash, setFlash] = React.useState(null)
   const alive = React.useRef(true)
   /** selection 的镜像：给事件回调读最新值（避免闭包捕获旧 state）。 */
@@ -452,7 +511,9 @@ function ShelfPanel() {
 
   // 选中 skill -> 拉正文
   const openSkill = React.useCallback(async (skill) => {
-    setDetail({ skill, text: '', loading: true, error: null, truncated: false })
+    // mode 取自书架数据（宿主已按 _state.json 附在每条 skill 上）
+    const mode = skill !== null && skill !== undefined && skill.mode === 'auto' ? 'auto' : 'manual'
+    setDetail({ skill, text: '', loading: true, error: null, truncated: false, mode, switching: false })
     setFlash(null)
     const result = await fetchSkill(skill.path)
     if (!alive.current) return
@@ -460,12 +521,13 @@ function ShelfPanel() {
       setDetail({
         skill, text: String(result.text === undefined ? '' : result.text),
         loading: false, error: null, truncated: result.truncated === true,
+        mode, switching: false,
       })
     } else {
       setDetail({
         skill, text: '', loading: false,
         error: result !== null && typeof result.message === 'string' ? result.message : '读取失败。',
-        truncated: false,
+        truncated: false, mode, switching: false,
       })
     }
   }, [])
@@ -474,7 +536,7 @@ function ShelfPanel() {
   const pickGroup = React.useCallback((name) => {
     selectionRef.current = { group: name, item: null }
     setSelection(selectionRef.current)
-    setDetail({ skill: null, text: '', loading: false, error: null, truncated: false })
+    setDetail({ skill: null, text: '', loading: false, error: null, truncated: false, mode: 'manual', switching: false })
     void load(name, null)
   }, [load])
 
@@ -482,9 +544,40 @@ function ShelfPanel() {
     const group = selectionRef.current.group
     selectionRef.current = { group, item: name }
     setSelection(selectionRef.current)
-    setDetail({ skill: null, text: '', loading: false, error: null, truncated: false })
+    setDetail({ skill: null, text: '', loading: false, error: null, truncated: false, mode: 'manual', switching: false })
     void load(group, name)
   }, [load])
+
+  /**
+   * 切换当前 skill 的自动/手动。
+   *
+   * 【为什么不乐观更新】开关是「被记住的约定」，界面上显示的状态必须与
+   * _state.json 一致。乐观更新在写失败时会显示一个**假的**「已自动」——
+   * 而用户会据此以为会话开头真会被读。宁可等写成功再改。
+   */
+  const switchMode = React.useCallback(async (mode) => {
+    const skill = detail.skill
+    if (skill === null || skill === undefined) return
+    setDetail((prev) => ({ ...prev, switching: true }))
+    setFlash(null)
+    const result = await postMode(skill.path, mode)
+    if (!alive.current) return
+    if (result !== null && result.ok === true) {
+      const actual = result.mode === 'auto' ? 'auto' : 'manual'
+      setDetail((prev) => ({ ...prev, mode: actual, switching: false }))
+      setFlash({
+        kind: 'ok',
+        text: actual === 'auto'
+          ? '已设为自动：之后每轮会话开头会被读取（会占上下文）。'
+          : '已设为手动：只在需要时由你取用。',
+      })
+      // 列表里的「自动」小点也要跟着变：重扫一次拿最新 mode
+      void load(selectionRef.current.group, selectionRef.current.item)
+    } else {
+      setDetail((prev) => ({ ...prev, switching: false }))
+      setFlash({ kind: 'error', text: '切换失败：' + String(result === null ? '宿主无响应' : result.message) })
+    }
+  }, [detail.skill, load])
 
   /**
    * 复制到剪贴板。优先用 navigator.clipboard，失败时退回一个隐藏 textarea +
@@ -571,7 +664,10 @@ function ShelfPanel() {
                     onClick: () => { void openSkill(skill) },
                   },
                   React.createElement('span', { className: 'dsh-cjg-ico' }, React.createElement(FileGlyph, null)),
-                  React.createElement('span', { className: 'dsh-cjg-row-name' }, skill.name))
+                  React.createElement('span', { className: 'dsh-cjg-row-name' }, skill.name),
+                  skill.mode === 'auto'
+                    ? React.createElement('span', { className: 'dsh-cjg-auto-dot', title: '已设为自动' })
+                    : null)
                 })),
             React.createElement('div', { className: 'dsh-cjg-body' },
               flash === null ? null : React.createElement('div', {
@@ -580,6 +676,8 @@ function ShelfPanel() {
               React.createElement(SkillDetail, {
                 skill: detail.skill, text: detail.text, loading: detail.loading,
                 error: detail.error, truncated: detail.truncated, onCopy: copy,
+                mode: detail.mode, switching: detail.switching,
+                onMode: (mode) => { void switchMode(mode) },
               })))))
 }
 
@@ -737,5 +835,5 @@ exports.inject = ['slots']
 exports.__view = { ShelfPanel, PanelIcon, Column, SkillDetail, FolderGlyph, FileGlyph }
 exports.__const = {
   CSS, ICON_SLOT, MAIN_SLOT, PANEL_ID, SOURCE_TRIGGER, SOURCE_NAME,
-  SHELF_URL, SKILL_URL,
+  SHELF_URL, SKILL_URL, MODE_URL,
 }

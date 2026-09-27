@@ -14,13 +14,20 @@
 // HTTP 路由（webServer.register，官方扩展点）。与天枢同一条路。
 // ---------------------------------------------------------------------------
 
-import { readdir, readFile, stat } from 'node:fs/promises'
+import { readdir, readFile, stat, writeFile } from 'node:fs/promises'
 import { homedir } from 'node:os'
 import { join, resolve, sep } from 'node:path'
 import {
   visibleEntries,
   shelfView,
   SKILL_MAX_BYTES,
+  STATE_FILE_NAME,
+  MODE_AUTO,
+  MODE_MANUAL,
+  normalizeState,
+  modeOf,
+  withMode,
+  autoSkills,
 } from './library.js'
 
 import { defineConfig } from './toolkit.js'
@@ -174,6 +181,58 @@ export async function readSkill(rootDir, targetPath) {
 }
 
 /**
+ * 读开关状态（根目录下的 _state.json）。
+ * 文件不存在或损坏都返回空状态 —— 状态是可再生的，不值得为它报错。
+ * @param rootDir - 藏经阁根目录。
+ * @returns 规格化后的状态。
+ */
+export async function readState(rootDir) {
+  try {
+    const text = await readFile(join(rootDir, STATE_FILE_NAME), 'utf8')
+    return normalizeState(JSON.parse(text))
+  } catch {
+    return normalizeState(null)
+  }
+}
+
+/**
+ * 写开关状态。
+ * @param rootDir - 藏经阁根目录。
+ * @param state - 规格化后的状态。
+ * @returns 是否写成功。
+ */
+export async function writeState(rootDir, state) {
+  try {
+    await writeFile(
+      join(rootDir, STATE_FILE_NAME),
+      JSON.stringify(normalizeState(state), null, 2) + '\n',
+      'utf8',
+    )
+    return true
+  } catch {
+    return false
+  }
+}
+
+/**
+ * 给书架视图里的每个 skill 附上它的模式，并把「自动」的清单一起给出去。
+ *
+ * 自动清单是给 Lead 看的：会话开头读这些文件。插件自己不读、不注入 ——
+ * 它只负责把「哪些该读」这件事说清楚。
+ * @param rootDir - 藏经阁根目录。
+ * @param tree - scanLibrary 的产物。
+ * @param view - shelfView 的产物。
+ * @returns { view, auto } —— 附带 mode 的视图 + 自动清单。
+ */
+export async function decorateWithModes(rootDir, tree, view) {
+  const state = await readState(rootDir)
+  const skills = Array.isArray(view.skills)
+    ? view.skills.map((s) => ({ ...s, mode: modeOf(state, s.path) }))
+    : []
+  return { view: { ...view, skills }, auto: autoSkills(state) }
+}
+
+/**
  * 插件主体。
  * @param ctx - 宿主侧根上下文。
  * @param config - 已解析的配置。
@@ -215,6 +274,64 @@ export function apply(ctx, config) {
     }
   }
 
+  /**
+   * 判定请求是不是来自本应用自己的页面。
+   *
+   * /cangjingge/mode 会写状态文件，而页面里加载的任何第三方内容（壁纸 URL、
+   * 外链图片、dataUrl）都能对 localhost:<port> 发 POST —— 端口每次启动都变，
+   * 但同源脚本不需要知道端口就能打中。所以对写操作做一次来源检查。
+   *
+   * 判据取保守的一条：带了 Origin 就必须与 Host 同源；没带 Origin 的
+   * （同源 fetch 常不带）放行，因为拦掉它会让正常按钮失效。
+   * @param req - HTTP 请求。
+   * @returns 是否允许。
+   */
+  function isTrustedOrigin(req) {
+    const origin = req.headers !== null && req.headers !== undefined ? req.headers.origin : undefined
+    if (origin === undefined || origin === null || origin === '') return true
+    const host = req.headers.host
+    if (host === undefined || host === null || host === '') return false
+    try {
+      const parsed = new URL(origin)
+      if (parsed.host !== host) return false
+      return parsed.protocol === 'http:' || parsed.protocol === 'https:'
+    } catch {
+      return false
+    }
+  }
+
+  /**
+   * 读请求体并解析成 JSON（有大小上限）。
+   *
+   * 超限时必须**把流收干净再返回**：直接 return 会让 for-await 悄悄销毁 req，
+   * 在 keep-alive 下可能留下一个半读的请求体，让后续请求错位。
+   * @param req - HTTP 请求。
+   * @returns 解析后的对象，失败为 {}。
+   */
+  async function readJsonBody(req) {
+    const chunks = []
+    let size = 0
+    let overflow = false
+    const LIMIT = 64 * 1024
+    for await (const chunk of req) {
+      if (overflow) continue
+      size += chunk.length
+      if (size > LIMIT) {
+        overflow = true
+        chunks.length = 0
+        continue
+      }
+      chunks.push(chunk)
+    }
+    if (overflow || chunks.length === 0) return {}
+    try {
+      const parsed = JSON.parse(Buffer.concat(chunks).toString('utf8'))
+      return parsed !== null && typeof parsed === 'object' ? parsed : {}
+    } catch {
+      return {}
+    }
+  }
+
   // GET /cangjingge/shelf —— 整座书架的树 + 三栏当前视图
   //
   // 一次把树给全（三层，几百个文件也就几十 KB），界面切换分组/子项时
@@ -224,10 +341,15 @@ export function apply(ctx, config) {
     path: '/cangjingge/shelf',
     handler: async (req, res) => {
       try {
+        const state = await readState(rootDir)
         const tree = await scanLibrary(rootDir)
         const group = queryParam(req, 'group')
         const item = queryParam(req, 'item')
         const view = shelfView(tree, { group, item })
+        // 给每个 skill 附上它的模式（auto / manual），并把自动清单一起给出去
+        const skills = Array.isArray(view.skills)
+          ? view.skills.map((s) => ({ ...s, mode: modeOf(state, s.path) }))
+          : []
         sendJson(res, 200, {
           ok: true,
           root: rootDir,
@@ -236,13 +358,74 @@ export function apply(ctx, config) {
             count: g.items.length,
             items: g.items.map((i) => ({ name: i.name, count: i.skills.length })),
           })),
-          view,
+          view: { ...view, skills },
+          // 「自动」清单：Lead 会话开头该读这些。插件自己不读、不注入。
+          auto: autoSkills(state),
         })
       } catch (error) {
         sendJson(res, 500, { ok: false, message: '扫描书架失败：' + String(error) })
       }
     },
   }), 'dsh-cangjingge: shelf route')
+
+  // POST /cangjingge/mode —— 切换某个 skill 的「自动 / 手动」
+  //
+  // 【这是写操作】所以要做来源校验（与天枢的 rollback 路由同一策略）。
+  // 语义：只改 _state.json 里的一条记录。绝对不动 skill 文件本身。
+  ctx.effect(() => ctx.webServer.register({
+    kind: 'exact',
+    path: '/cangjingge/mode',
+    handler: async (req, res) => {
+      try {
+        if (req.method !== 'POST') {
+          sendJson(res, 405, { ok: false, message: '请用 POST。' })
+          return
+        }
+        if (!isTrustedOrigin(req)) {
+          sendJson(res, 403, { ok: false, message: '来源不被信任，拒绝修改。' })
+          return
+        }
+        const body = await readJsonBody(req)
+        const target = typeof body.path === 'string' ? body.path : ''
+        const mode = body.mode === MODE_AUTO ? MODE_AUTO : MODE_MANUAL
+        if (target.length === 0) {
+          sendJson(res, 200, { ok: false, message: '缺少 path。' })
+          return
+        }
+        // 与读 skill 同一条路径校验：只能在根目录之内
+        const root = resolve(rootDir)
+        const full = resolve(target)
+        if (full !== root && !full.startsWith(root + sep)) {
+          sendJson(res, 200, { ok: false, message: '拒绝修改藏经阁之外的路径。' })
+          return
+        }
+        const current = await readState(rootDir)
+        const next = withMode(current, full, mode)
+        const saved = await writeState(rootDir, next)
+        if (!saved) {
+          sendJson(res, 200, { ok: false, message: '状态文件写入失败。' })
+          return
+        }
+        sendJson(res, 200, { ok: true, path: full, mode, auto: autoSkills(next) })
+      } catch (error) {
+        sendJson(res, 500, { ok: false, message: '切换失败：' + String(error) })
+      }
+    },
+  }), 'dsh-cangjingge: mode route')
+
+  // GET /cangjingge/auto —— 只取「自动」清单（给 Lead 用的轻量入口）
+  ctx.effect(() => ctx.webServer.register({
+    kind: 'exact',
+    path: '/cangjingge/auto',
+    handler: async (_req, res) => {
+      try {
+        const state = await readState(rootDir)
+        sendJson(res, 200, { ok: true, auto: autoSkills(state) })
+      } catch (error) {
+        sendJson(res, 500, { ok: false, message: '读取失败：' + String(error) })
+      }
+    },
+  }), 'dsh-cangjingge: auto route')
 
   // GET /cangjingge/skill?path=... —— 读一个 skill 的正文
   ctx.effect(() => ctx.webServer.register({

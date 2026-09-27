@@ -14,6 +14,13 @@ import {
   skillInsertText,
   skillCandidates,
   parseCandidateValue,
+  normalizeState,
+  modeOf,
+  withMode,
+  autoSkills,
+  STATE_FILE_NAME,
+  MODE_AUTO,
+  MODE_MANUAL,
   SKILL_EXTENSIONS,
 } from '../src/library.js'
 
@@ -142,6 +149,51 @@ eq(parseCandidateValue('不是JSON'), null, '坏 JSON 返回 null')
 eq(parseCandidateValue('{"kind":"other"}'), null, '非 skill kind 返回 null')
 eq(parseCandidateValue(''), null, '空串返回 null')
 eq(parseCandidateValue(null), null, 'null 返回 null')
+
+// ---- 自动/手动开关（状态纯函数）------------------------------------------------
+eq(STATE_FILE_NAME, '_state.json', '状态文件名以下划线开头（会被书架过滤）')
+eq(MODE_AUTO, 'auto', 'MODE_AUTO 取值')
+eq(MODE_MANUAL, 'manual', 'MODE_MANUAL 取值')
+
+{
+  // 脏数据要被丢掉，而不是静默兜底成 manual
+  const s = normalizeState({ skills: { '/a.md': 'auto', '/b.md': 'manual', '/c.md': 'garbage', '/d.md': 7 } })
+  eq(s.skills['/a.md'], 'auto', '保留 auto')
+  eq(s.skills['/b.md'], 'manual', '保留 manual')
+  eq(s.skills['/c.md'], undefined, '丢掉未知取值')
+  eq(s.skills['/d.md'], undefined, '丢掉非字符串取值')
+}
+
+eq(normalizeState(null).skills, {}, 'null 状态 -> 空')
+eq(normalizeState('x').skills, {}, '非对象状态 -> 空')
+eq(normalizeState({ skills: [] }).skills, {}, 'skills 是数组 -> 空')
+
+{
+  const empty = normalizeState(null)
+  eq(modeOf(empty, '/x.md'), 'manual', '没记录过默认手动')
+  const s = withMode(empty, '/x.md', 'auto')
+  eq(modeOf(s, '/x.md'), 'auto', '设为自动后读到 auto')
+  eq(modeOf(empty, '/x.md'), 'manual', 'withMode 不改原对象')
+  const back = withMode(s, '/x.md', 'manual')
+  eq(modeOf(back, '/x.md'), 'manual', '设回手动')
+  // 设回手动时应删除键，而不是写 'manual' —— 否则文件被撑大
+  eq(Object.prototype.hasOwnProperty.call(back.skills, '/x.md'), false, '设回手动时删除键')
+}
+
+{
+  let s = normalizeState(null)
+  s = withMode(s, '/b.md', 'auto')
+  s = withMode(s, '/a.md', 'auto')
+  s = withMode(s, '/c.md', 'manual')
+  eq(autoSkills(s), ['/a.md', '/b.md'], '自动清单只含 auto 且已排序')
+  eq(autoSkills(normalizeState(null)), [], '空状态自动清单为空')
+}
+
+{
+  // 坏条目不该混进自动清单
+  const s = normalizeState({ skills: { '/a.md': 'auto', '/z.md': 'nonsense' } })
+  eq(autoSkills(s), ['/a.md'], '坏条目不进自动清单')
+}
 
 // ---- 结果 ---------------------------------------------------------------------
 if (failures.length > 0) {

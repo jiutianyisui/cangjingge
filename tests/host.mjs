@@ -10,7 +10,7 @@
 //   - 路径安全：拒绝读根目录之外的文件
 // ---------------------------------------------------------------------------
 
-import { mkdtemp, mkdir, writeFile, rm } from 'node:fs/promises'
+import { mkdtemp, mkdir, writeFile, rm, readFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import * as host from '../src/host.js'
@@ -83,9 +83,11 @@ await writeFile(secret, 'SECRET', 'utf8')
 const ctx = makeCtx()
 host.apply(ctx, { libraryDir: root })
 
-eq(routes.length, 3, '注册了三个路由')
+eq(routes.length, 5, '注册了五个路由')
 eq(routes.map((r) => r.path).sort(), [
+  '/cangjingge/auto',
   '/cangjingge/candidates',
+  '/cangjingge/mode',
   '/cangjingge/shelf',
   '/cangjingge/skill',
 ], '路由路径正确')
@@ -169,6 +171,100 @@ async function callRoute(path, url) {
 {
   const r = await callRoute('/cangjingge/candidates', '/cangjingge/candidates')
   eq(r.json.ok, true, 'candidates ok=true')
+}
+
+// ---- 自动/手动开关（路由）------------------------------------------------------
+// 需要能发 POST 的假 req（带 body 流）
+function fakeReq(url, method, body) {
+  const text = typeof body === 'string' ? body : ''
+  const chunks = text.length > 0 ? [Buffer.from(text, 'utf8')] : []
+  return {
+    url, method, headers: {},
+    async *[Symbol.asyncIterator]() { for (const c of chunks) yield c },
+  }
+}
+async function callPost(path, url, body) {
+  const route = routes.find((r) => r.path === path)
+  const res = fakeRes()
+  await route.handler(fakeReq(url, 'POST', body), res)
+  return { status: res.state.status, json: JSON.parse(res.state.body) }
+}
+
+const skillA = join(root, '易经', '乾', 'a.md')
+const skillC = join(root, '兵法', '谋', 'c.md')
+
+{
+  // 初始：全是手动。注意「易经」下按拼音第一个子项是「坤」（含 b.txt），
+  // 要看「乾」里的 a.md 得显式指定 item。
+  const r = await callRoute('/cangjingge/shelf', '/cangjingge/shelf?group=' + encodeURIComponent('易经') + '&item=' + encodeURIComponent('乾'))
+  const a = r.json.view.skills.find((s) => s.path === skillA)
+  ok(a !== undefined, '能找到 a.md')
+  eq(a.mode, 'manual', '默认是手动')
+  eq(r.json.auto, [], '初始自动清单为空')
+}
+
+{
+  const r = await callPost('/cangjingge/mode', '/cangjingge/mode', JSON.stringify({ path: skillA, mode: 'auto' }))
+  eq(r.json.ok, true, '设为自动成功')
+  eq(r.json.mode, 'auto', '回传 auto')
+  eq(r.json.auto, [skillA], '自动清单含该文件')
+}
+
+{
+  // shelf 上要能看到新状态
+  const r = await callRoute('/cangjingge/shelf', '/cangjingge/shelf?group=' + encodeURIComponent('易经') + '&item=' + encodeURIComponent('乾'))
+  const a = r.json.view.skills.find((s) => s.path === skillA)
+  eq(a.mode, 'auto', 'shelf 反映 auto')
+  eq(r.json.auto, [skillA], 'shelf 回传 auto 清单')
+}
+
+{
+  // 状态文件确实落盘，且不含 manual 记录
+  const raw = JSON.parse(await readFile(join(root, '_state.json'), 'utf8'))
+  eq(raw.skills[skillA], 'auto', '状态文件记录了 auto')
+}
+
+{
+  const r = await callRoute('/cangjingge/auto', '/cangjingge/auto')
+  eq(r.json.auto, [skillA], '/auto 路由返回自动清单')
+}
+
+{
+  // 设回手动 -> 从清单消失
+  const r = await callPost('/cangjingge/mode', '/cangjingge/mode', JSON.stringify({ path: skillA, mode: 'manual' }))
+  eq(r.json.ok, true, '设回手动成功')
+  eq(r.json.mode, 'manual', '回传 manual')
+  eq(r.json.auto, [], '自动清单变空')
+}
+
+{
+  // 写操作必须挡住根目录之外的路径
+  const r = await callPost('/cangjingge/mode', '/cangjingge/mode', JSON.stringify({ path: secret, mode: 'auto' }))
+  eq(r.json.ok, false, '拒绝把藏经阁之外的文件设为自动')
+}
+
+{
+  // GET 打写路由 -> 405
+  const route = routes.find((r) => r.path === '/cangjingge/mode')
+  const res = fakeRes()
+  await route.handler(fakeReq('/cangjingge/mode', 'GET', ''), res)
+  eq(res.state.status, 405, 'GET 打 mode 路由返回 405')
+}
+
+{
+  // 跨源来源被拒（带 Origin 且与 Host 不同）
+  const route = routes.find((r) => r.path === '/cangjingge/mode')
+  const res = fakeRes()
+  const req = fakeReq('/cangjingge/mode', 'POST', JSON.stringify({ path: skillC, mode: 'auto' }))
+  req.headers = { origin: 'https://evil.example', host: 'localhost:1234' }
+  await route.handler(req, res)
+  eq(res.state.status, 403, '跨源来源被拒 403')
+}
+
+{
+  // 缺 path -> ok:false
+  const r = await callPost('/cangjingge/mode', '/cangjingge/mode', JSON.stringify({ mode: 'auto' }))
+  eq(r.json.ok, false, '缺 path 返回 ok=false')
 }
 
 // ---- 清理 ---------------------------------------------------------------------

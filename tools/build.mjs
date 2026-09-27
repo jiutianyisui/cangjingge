@@ -42,6 +42,8 @@ const PARTS = [
       'SKILL_EXTENSIONS', 'SKILL_MAX_BYTES', 'MAX_ENTRIES_PER_DIR',
       'isSkillFile', 'visibleEntries', 'shelfView', 'skillInsertText',
       'skillCandidates', 'parseCandidateValue',
+      'STATE_FILE_NAME', 'MODE_AUTO', 'MODE_MANUAL',
+      'normalizeState', 'modeOf', 'withMode', 'autoSkills',
     ],
   },
   {
@@ -50,6 +52,8 @@ const PARTS = [
       'SKILL_EXTENSIONS', 'SKILL_MAX_BYTES', 'MAX_ENTRIES_PER_DIR',
       'isSkillFile', 'visibleEntries', 'shelfView', 'skillInsertText',
       'skillCandidates', 'parseCandidateValue',
+      'STATE_FILE_NAME', 'MODE_AUTO', 'MODE_MANUAL',
+      'normalizeState', 'modeOf', 'withMode', 'autoSkills',
     ],
     carry: [],
   },
