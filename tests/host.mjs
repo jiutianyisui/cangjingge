@@ -102,16 +102,27 @@ process.env.DSH_CANGJINGGE_SETTINGS = settingsFile
 const ctx = makeCtx()
 host.apply(ctx, { libraryDir: root })
 
-eq(routes.length, 7, '注册了七个路由（settings 的 GET/POST 各算一条）')
+eq(routes.length, 6, '注册了六个路由（settings 的 GET/POST 合成一条）')
 eq(routes.map((r) => r.path).sort(), [
   '/cangjingge/auto',
   '/cangjingge/candidates',
   '/cangjingge/mode',
   '/cangjingge/settings',
-  '/cangjingge/settings',
   '/cangjingge/shelf',
   '/cangjingge/skill',
 ], '路由路径正确')
+// 【关键回归】同一 path 不许注册两条 exact 路由 —— dsh 的 webServer 会抛
+// duplicate exact route，而抛错发生在 ctx.effect 里 -> 整个插件的 effect
+// 被回滚 -> 所有路由消失 -> 全站 404（真实事故，症状像"插件没加载"）
+{
+  const seen = new Set()
+  let dup = null
+  for (const r of routes) {
+    if (seen.has(r.path)) { dup = r.path; break }
+    seen.add(r.path)
+  }
+  eq(dup, null, '没有重复的 exact 路由路径')
+}
 for (const r of routes) ok(r.kind === 'exact', '路由 ' + r.path + ' kind=exact')
 
 // ---- 扫描 ---------------------------------------------------------------------
@@ -346,16 +357,20 @@ const skillC = join(root, '兵法', '谋', 'c.md')
 }
 
 {
-  // GET 打写路由 -> 405
-  const route = routes.filter((x) => x.path === '/cangjingge/settings')[1]
-  const res = fakeRes()
-  await route.handler(fakeReq('/cangjingge/settings', 'GET', ''), res)
-  eq(res.state.status, 405, 'GET 打 settings POST 路由返回 405')
+  // settings 是**一条**路由：GET 走读分支（不是 405），不支持的 method 才 405
+  const route = routes.find((x) => x.path === '/cangjingge/settings')
+  const resGet = fakeRes()
+  await route.handler(fakeReq('/cangjingge/settings', 'GET', ''), resGet)
+  eq(resGet.state.status, 200, '同一路由 GET 走读分支返回 200')
+
+  const resPut = fakeRes()
+  await route.handler(fakeReq('/cangjingge/settings', 'PUT', ''), resPut)
+  eq(resPut.state.status, 405, '不支持的 method 返回 405')
 }
 
 {
   // 跨源被拒
-  const route = routes.filter((x) => x.path === '/cangjingge/settings')[1]
+  const route = routes.find((x) => x.path === '/cangjingge/settings')
   const res = fakeRes()
   const req = fakeReq('/cangjingge/settings', 'POST', JSON.stringify({ libraryDir: 'E:/x' }))
   req.headers = { origin: 'https://evil.example', host: 'localhost:1' }
@@ -377,7 +392,7 @@ const skillC = join(root, '兵法', '谋', 'c.md')
   let threw = false
   try { host.apply(ctx2, { libraryDir: root }) } catch { threw = true }
   eq(threw, false, 'systemPrompt 不可用时 apply 不抛')
-  eq(r2.length, 7, 'systemPrompt 不可用时路由照常注册（降级而非阵亡）')
+  eq(r2.length, 6, 'systemPrompt 不可用时路由照常注册（降级而非阵亡）')
 }
 
 // ---- 自动注入（systemPrompt.section）------------------------------------------
