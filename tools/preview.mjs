@@ -95,14 +95,6 @@ const body = `
           <button class="dsh-cjg-btn">复制路径</button>
           <button class="dsh-cjg-btn dsh-cjg-btn-primary">复制全文</button>
         </div>
-        <div class="dsh-cjg-mode-row">
-          <span class="dsh-cjg-mode-label">加载方式</span>
-          <span class="dsh-cjg-switch">
-            <button class="dsh-cjg-switch-btn">手动</button>
-            <button class="dsh-cjg-switch-btn dsh-cjg-switch-on">自动</button>
-          </span>
-          <span class="dsh-cjg-mode-label">已标记为自动：会话开头会被读取</span>
-        </div>
         <div class="dsh-cjg-hint">在聊天输入框里打 <span class="dsh-cjg-kbd">/</span>　打开菜单 → 选「藏经阁」→ 挑这个 skill，即可插入当前对话。</div>
         <div class="dsh-cjg-paper"><pre class="dsh-cjg-pre"># 史记
 
