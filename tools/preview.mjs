@@ -46,6 +46,28 @@ function row(glyphPath, name, count, on) {
   </button>`
 }
 
+/**
+ * 带「✓ /」徽标的行。
+ * @param glyphPath - 图标 svg。
+ * @param name - 文件名。
+ * @param crumb - 已废弃（第四栏改为只显示文件名），保留参数位以便调用处统一。
+ * @param on - 是否选中。
+ * @param lit - 是否已点亮（金色徽标 / 灰色占位）。
+ * @param litList - true = 第四栏的行（行尾是「×」移除钮，不带徽标）。
+ */
+function litRow(glyphPath, name, crumb, on, lit, litList) {
+  const cls = 'dsh-cjg-row' + (litList ? ' dsh-cjg-lit-row' : '')
+    + (on ? ' dsh-cjg-row-on' : '') + (lit || litList ? '' : ' dsh-cjg-row-hidden')
+  const tail = litList
+    ? '<span class="dsh-cjg-lit-remove">×</span>'
+    : (lit ? '<span class="dsh-cjg-auto-dot">✓ /</span>' : '<span class="dsh-cjg-auto-dot-off">○ /</span>')
+  return `<button class="${cls}">
+    <span class="dsh-cjg-ico">${glyphPath}</span>
+    <span class="dsh-cjg-row-name">${name}</span>
+    ${tail}
+  </button>`
+}
+
 const folder = `<svg viewBox="0 0 16 16" width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round" stroke-linecap="round"><path d="M1.6 3.6 h4.2 l1.3 1.7 h7.3 v6.9 a.8.8 0 0 1 -.8.8 h-11.2 a.8.8 0 0 1 -.8-.8 z"/></svg>`
 const file = `<svg viewBox="0 0 16 16" width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round" stroke-linecap="round"><path d="M3.4 1.9 h5.6 l3.6 3.6 v8.6 a.8.8 0 0 1 -.8.8 h-8.4 a.8.8 0 0 1 -.8-.8 z"/><path d="M9 1.9 v3.6 h3.6"/></svg>`
 const fileBig = file.replace('width="13" height="13"', 'width="15" height="15"')
@@ -79,13 +101,14 @@ const body = `
       </div>
     </div>
     <div class="dsh-cjg-col dsh-cjg-col-r">
-      <div class="dsh-cjg-list-top">
+      <div class="dsh-cjg-half">
         <div class="dsh-cjg-col-head"><span>skill</span><span class="dsh-cjg-spacer"></span><span class="dsh-cjg-count">3</span></div>
-        ${row(file, '史记.md', null, true)}
-        ${row(file, '汉书.md', null, false)}
-        ${row(file, '后汉书.markdown', null, false)}
-      </div>
-      <div class="dsh-cjg-body">
+        <div class="dsh-cjg-list">
+          ${litRow(file, '史记.md', null, true, true)}
+          ${litRow(file, '汉书.md', null, false, false)}
+          ${litRow(file, '后汉书.markdown', null, false, false)}
+        </div>
+        <div class="dsh-cjg-body">
         <div class="dsh-cjg-skill-head">
           <span class="dsh-cjg-ico" style="opacity:1;color:var(--dsh-cjg-gold)">${fileBig}</span>
           <span class="dsh-cjg-skill-name">史记.md</span>
@@ -103,11 +126,26 @@ const body = `
 夫子之弗论次其年月，岂虚哉！
 
 于是以五帝系谍、尚书集世纪黄帝以来讫共和为世表。</pre></div>
+        </div>
+      </div>
+      <div class="dsh-cjg-col-lit">
+        <div class="dsh-cjg-lit-list">
+          <div class="dsh-cjg-col-head"><span>已点亮</span><span class="dsh-cjg-spacer"></span><button class="dsh-cjg-mini">清空</button><span class="dsh-cjg-count">2</span></div>
+          ${litRow(file, '史记.md', null, true, true, true)}
+          ${litRow(file, '论语.md', null, false, true, true)}
+        </div>
+        <div class="dsh-cjg-lit-body">
+          <div class="dsh-cjg-lit-body-name">史记.md</div>
+          <pre class="dsh-cjg-pre"># 史记
+
+太史公曰：余读谍记，黄帝以来皆有年数。
+稽其历谱谍终始五德之传，古文咸不同，乖异。</pre>
+        </div>
       </div>
     </div>
   </div>
 </div>
-<div class="dsh-cjg-modal-mask">
+<div class="dsh-cjg-modal-mask" style="display:none">
   <div class="dsh-cjg-modal">
     <div class="dsh-cjg-modal-title">藏经阁 · 设置</div>
     <div class="dsh-cjg-effective">

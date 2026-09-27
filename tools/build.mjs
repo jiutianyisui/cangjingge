@@ -42,7 +42,7 @@ const PARTS = [
       'SKILL_EXTENSIONS', 'SKILL_MAX_BYTES', 'MAX_ENTRIES_PER_DIR',
       'isSkillFile', 'visibleEntries', 'shelfView', 'skillInsertText',
       'skillCandidates', 'parseCandidateValue',
-      'VISIBLE_FILE_NAME', 'normalizeVisible', 'isVisible', 'withVisible', 'visibleSkills',
+      'VISIBLE_FILE_NAME', 'normalizeVisible', 'isVisible', 'withVisible', 'visibleSkills', 'litSkills',
       'filterCandidates',
       'SETTINGS_FILE_NAME', 'normalizeSettings', 'pickLibraryDir', 'validateLibraryDir',
     ],
@@ -53,7 +53,7 @@ const PARTS = [
       'SKILL_EXTENSIONS', 'SKILL_MAX_BYTES', 'MAX_ENTRIES_PER_DIR',
       'isSkillFile', 'visibleEntries', 'shelfView', 'skillInsertText',
       'skillCandidates', 'parseCandidateValue',
-      'VISIBLE_FILE_NAME', 'normalizeVisible', 'isVisible', 'withVisible', 'visibleSkills',
+      'VISIBLE_FILE_NAME', 'normalizeVisible', 'isVisible', 'withVisible', 'visibleSkills', 'litSkills',
       'filterCandidates',
       'SETTINGS_FILE_NAME', 'normalizeSettings', 'pickLibraryDir', 'validateLibraryDir',
     ],
@@ -425,7 +425,8 @@ if (typeof exported.__view.PanelIcon !== 'function') fail('PanelIcon 没有正�
     'execCommand', 'select', 'setProperty',
     // 对象字面量的方法简写键名（candidates() {} / onPick() {} / openReference() {}），
     // 会被"直接调用"的正则当成调用 —— 它们不是自由变量。
-    'candidates', 'onPick', 'openReference', 'header',
+    // codec 里的 serialize / clipboardText 同理（ReferenceCodec 要求的方法名）。
+    'candidates', 'onPick', 'openReference', 'header', 'serialize', 'clipboardText',
     'in', 'of', 'do', 'else', 'try', 'finally', 'throw', 'case', 'yield', 'super', 'import'])
 
   const called = new Set()

@@ -172,6 +172,102 @@ if (registered !== null) {
   eq(names[0], '团队 / 编制 / 规程.md', '返回的是勾选过的那个')
   eq(rows.some((r) => r.name.includes('其他.md')), false, '未勾选的 其他.md 不出现')
   eq(rows.some((r) => r.name.includes('孙子.md')), false, '未勾选的 孙子.md 不出现')
+
+  // 【关键回归】source 必须带 codec —— 否则**发送**带引用的草稿会抛：
+  //   slash: no serializer for reference source "cangjingge"
+  // 插入时看着正常，提交那一刻才失败，症状极具误导性。
+  ok(registered.codec !== undefined && registered.codec !== null, 'source 带 codec（否则发送报错）')
+  if (registered.codec !== undefined && registered.codec !== null) {
+    eq(typeof registered.codec.serialize, 'function', 'codec.serialize 是函数')
+    eq(typeof registered.codec.clipboardText, 'function', 'codec.clipboardText 是函数')
+    const out = await registered.codec.serialize('/x/团队/编制/规程.md', new AbortController().signal)
+    eq(out, '/x/团队/编制/规程.md', 'serialize 回传路径（模型能直接 read）')
+    eq(registered.codec.clipboardText('/x/团队/编制/规程.md'), '/x/团队/编制/规程.md', 'clipboardText 回传路径')
+  }
+
+  // onPick 的 insert 形状也要对（source 名必须与注册名一致，否则 roster 找不到 owner）
+  const pick = registered.onPick({
+    candidate: { value: JSON.stringify({ kind: 'skill', name: '规程.md', path: '/x/团队/编制/规程.md' }) },
+    session: { sessionId: 's1' }, position: 'leading', via: 'menu',
+    span: { start: 0, end: 1, draftRev: 1 },
+  })
+  ok(pick !== undefined && pick.insert !== undefined, 'onPick 返回 insert')
+  eq(pick.insert.source, registered.name, 'insert.source 与注册名一致（roster 才找得到 owner）')
+  eq(pick.insert.ref, '/x/团队/编制/规程.md', 'insert.ref 是路径')
+}
+
+// ---- 列表行内的徽标是开关 -------------------------------------------------------
+// 面板的列表行渲染要能拿到「可点的徽标」，且点击时不触发行点击（否则会误开文件）。
+{
+  const view = exportsObj.__view || {}
+  ok(typeof view.ShelfPanel === 'function', '导出了 ShelfPanel')
+
+  // 真渲染一次面板（假 React 会把元素树建成 {args} 结构），然后深度找出徽标节点。
+  let tree = null
+  try {
+    // ShelfPanel 内部用 hooks，假 React 的 useState 返回固定初值 —— 拿到的是初始树。
+    tree = view.ShelfPanel({})
+  } catch (error) {
+    ok(false, 'ShelfPanel 能渲染：' + String(error && error.message ? error.message : error))
+  }
+  ok(tree !== null, 'ShelfPanel 返回元素树')
+
+  function walk(node, visit) {
+    if (node === null || node === undefined || typeof node !== 'object') return
+    if (Array.isArray(node)) { for (const n of node) walk(n, visit); return }
+    if (Array.isArray(node.args)) {
+      visit(node)
+      for (const a of node.args) walk(a, visit)
+    }
+  }
+
+  let badge = null
+  walk(tree, (node) => {
+    const props = node.args[1]
+    if (props === null || props === undefined || typeof props !== 'object') return
+    const cls = typeof props.className === 'string' ? props.className : ''
+    if (cls.includes('dsh-cjg-auto-dot')) badge = props
+  })
+  // 初始 state 是 loading（假 React 不跑副作用），所以列表可能还没出来 ——
+  // 这种情况下只验证「模块里确实带了可点徽标的实现」。
+  const source = readFileSync(clientPath, 'utf8')
+  ok(source.includes('dsh-cjg-auto-dot-off'), '未显示的灰色占位徽标已实现')
+  ok(/onClick:\s*\(event\)\s*=>\s*\{[\s\S]{0,200}stopPropagation/.test(source), '徽标点击会 stopPropagation（不误开文件）')
+  ok(source.includes('toggleVisible'), '存在按 path 切换的函数（不依赖先点开文件）')
+}
+
+// ---- 四栏结构：左右各自「列表 + 正文」--------------------------------------------
+// 【钉住的坑】曾经两栏共用一个正文区，点第四栏会把左边正在看的正文顶掉。
+//   现在两边各自持有 detail / litDetail，渲染上也是各自一个 body。
+{
+  const source = readFileSync(clientPath, 'utf8')
+
+  ok(source.includes('litDetail'), '第四栏有自己的 detail state（不与左侧共用）')
+  ok(source.includes('openLitDetail'), '存在只给第四栏用的取正文函数')
+
+  // 两侧各自一个正文容器：.dsh-cjg-body（左）与 .dsh-cjg-lit-body（右）
+  ok(source.includes('dsh-cjg-lit-body'), '第四栏正文容器已实现')
+  ok(source.includes('dsh-cjg-lit-list'), '第四栏列表容器已实现')
+
+  // 第四栏的条目**不再**显示面包屑
+  ok(!source.includes('dsh-cjg-lit-crumb'), '第四栏条目不再带面包屑（只显示文件名）')
+
+  // 第四栏的正文是只读的：不该出现「复制全文」这类操作按钮
+  // 【为什么用 src 而不是 bundle】bundle 是拼接产物，函数边界在压缩/拼接后
+  //   不好切；源码里函数是顶格写的，切起来可靠。
+  const srcPath = join(root, 'src', '@client.js')
+  const srcText = readFileSync(srcPath, 'utf8')
+  const litStart = srcText.indexOf('function LitDetail')
+  ok(litStart > 0, '存在 LitDetail 组件')
+  if (litStart > 0) {
+    const rest = srcText.slice(litStart + 1)
+    const nextFn = rest.indexOf('\nfunction ')
+    const litBody = nextFn >= 0 ? rest.slice(0, nextFn) : rest
+    ok(!litBody.includes('复制全文') && !litBody.includes('复制路径'), '第四栏正文区无操作按钮（只显示正文）')
+  }
+
+  // 旧的共用容器（第三栏整体横切一刀）不该再出现
+  ok(!source.includes('dsh-cjg-split') || !/dsh-cjg-split\{[^}]*height:/.test(source), '旧的共用分栏容器已移除')
 }
 
 // ---- 结果 ---------------------------------------------------------------------

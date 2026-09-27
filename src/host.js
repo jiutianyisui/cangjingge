@@ -35,6 +35,7 @@ import {
   normalizeVisible,
   isVisible,
   withVisible,
+  litSkills,
   normalizeSettings,
   pickLibraryDir,
   validateLibraryDir,
@@ -424,6 +425,8 @@ export function apply(ctx, config) {
           root: rootDir,
           groups: groupStats,
           view: { ...view, skills },
+          // 第四栏「已点亮」：按书架顺序平铺所有已勾选项（含定位用的分组/子项名）。
+          lit: litSkills(tree, state),
         })
       } catch (error) {
         sendJson(res, 500, { ok: false, message: '扫描书架失败：' + String(error) })

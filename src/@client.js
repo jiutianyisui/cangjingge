@@ -86,23 +86,35 @@ const CSS = [
   '.dsh-cjg-btn-primary{border-color:var(--dsh-cjg-gold-line);background:var(--dsh-cjg-gold-soft)}',
   '.dsh-cjg-btn-primary:hover{background:var(--dsh-cjg-gold-soft);border-color:var(--dsh-cjg-gold)}',
 
-  // ── 三栏骨架 ────────────────────────────────────────────────────────────
+  // ── 三栏骨架（第三栏再横分两半，右半是第四栏「已点亮」）─────────────────
   '.dsh-cjg-cols{position:relative;z-index:1;flex:1 1 auto;display:flex;min-height:0;min-width:0;gap:0}',
   '.dsh-cjg-col{display:flex;flex-direction:column;min-height:0;min-width:0}',
   // 栏宽用 clamp：窄窗口不至于挤成一条缝，宽窗口也不会空得发慌
-  '.dsh-cjg-col-l{flex:0 0 clamp(132px,17vw,178px)}',
-  // 分栏用「发丝线 + 微光」而不是整块边框：更像纸页折痕
-  '.dsh-cjg-col-m,.dsh-cjg-col-r{border-left:1px solid var(--dsw-alias-border-l1)}',
-  '.dsh-cjg-col-m{flex:0 0 clamp(132px,17vw,178px)}',
-  '.dsh-cjg-col-r{flex:1 1 auto}',
-  // 右栏的 skill 列表**不**占满剩余高度：它按内容自然高，上限为栏高的一半。
-  // 否则一两个 skill 时列表会把下面撑出一大段空白（详情被推到很下面）。
-  '.dsh-cjg-list-top{flex:0 1 auto;max-height:42%;min-height:0;overflow-y:auto;padding:0 8px 8px;border-bottom:1px solid var(--dsw-alias-border-l1)}',
+  '.dsh-cjg-col-l{flex:0 0 clamp(118px,15vw,162px)}',
+  // 分栏用「发丝线」而不是整块边框：更像纸页折痕
+  '.dsh-cjg-col-m,.dsh-cjg-col-r{border-left:1px solid var(--dsw-alias-border-l1)}',  '.dsh-cjg-col-m{flex:0 0 clamp(118px,15vw,162px)}',
+  '.dsh-cjg-col-r{flex:1 1 auto;flex-direction:row}',
+  // 第三栏内部横向一分为二，**每半各自纵向排「列表 / 正文」**：
+  //   左半 = 当前子项的 skill 列表 + 详情
+  //   右半 = 已点亮列表 + 它自己的只读正文
+  //   两边互不覆盖：点第四栏不会顶掉左边正在看的正文。
+  '.dsh-cjg-half{display:flex;flex-direction:column;min-height:0;min-width:0;flex:1 1 50%}',
+  // 第四栏：右侧暖金渐隐底 + 更明显的左分界，视觉上从「列出全部」里跳出来
+  '.dsh-cjg-col-lit{position:relative;display:flex;flex-direction:column;flex:1 1 50%;min-height:0;min-width:0;border-left:1px solid var(--dsw-alias-border-l1);background:linear-gradient(180deg,var(--dsh-cjg-gold-soft),transparent 38%)}',
+  '.dsh-cjg-col-lit::before{content:"";position:absolute;left:-1px;top:0;bottom:0;width:1px;background:linear-gradient(180deg,var(--dsh-cjg-gold-line),transparent 60%);pointer-events:none}',
+  // 第四栏的列表区：按内容自然高，上限 55%（下面留给正文）
+  '.dsh-cjg-lit-list{flex:0 1 auto;max-height:55%;min-height:0;overflow-y:auto;padding:0 8px 8px}',
+  // 第四栏的正文区（只读）
+  '.dsh-cjg-lit-body{flex:1 1 auto;min-height:0;overflow:auto;padding:9px 12px 16px;border-top:1px solid var(--dsw-alias-border-l1);font-size:11.5px;line-height:1.7}',
+  '.dsh-cjg-lit-body-empty{display:flex;align-items:center;justify-content:center;padding:16px 12px;text-align:center;color:var(--dsw-alias-label-tertiary);font-size:11px}',
+  '.dsh-cjg-lit-body-name{font-weight:600;font-size:12px;margin-bottom:6px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}',
 
   // ── 栏头 ────────────────────────────────────────────────────────────────
   // 中文不做 uppercase（text-transform 对汉字无效，但会把英文栏名拉成
   // 全大写 + 大字距，中文栏名旁边就显得突兀）。统一按小号粗体处理。
   '.dsh-cjg-col-head{flex:0 0 auto;display:flex;align-items:center;gap:5px;padding:9px 12px 6px;font-size:10px;font-weight:600;letter-spacing:.06em;color:var(--dsw-alias-label-tertiary)}',
+  // 第四栏的栏头用金色 —— 它是「我的选择」，和左侧两个导航栏区分开
+  '.dsh-cjg-col-lit .dsh-cjg-col-head{color:var(--dsh-cjg-gold)}',
   '.dsh-cjg-count{font-weight:400;letter-spacing:0;opacity:.75}',
 
   // ── 列表与行（卡片化）──────────────────────────────────────────────────
@@ -123,6 +135,18 @@ const CSS = [
   '.dsh-cjg-row-name{flex:1 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}',
   '.dsh-cjg-count-chip{flex:0 0 auto;font-size:9.5px;min-width:15px;text-align:center;padding:1px 5px;border-radius:999px;background:var(--dsw-alias-bg-layer-2);color:var(--dsw-alias-label-tertiary)}',
   '.dsh-cjg-row-on .dsh-cjg-count-chip{background:var(--dsh-cjg-gold-soft);color:var(--dsh-cjg-gold)}',
+
+  // ── 第四栏「已点亮」的行 ────────────────────────────────────────────────
+  // 单行式：只显示文件名。「它在哪个分组」放 tooltip —— 这一栏是「我挑中了
+  // 哪些」，不是「它们在哪儿」，列表里再挂一行面包屑纯属噪音。
+  '.dsh-cjg-lit-row{padding:5px 8px;margin-bottom:2px}',
+  // 「×」平时隐形，悬停行才浮现：列表很长时满屏的叉号很吵
+  '.dsh-cjg-lit-remove{flex:0 0 auto;display:inline-flex;align-items:center;justify-content:center;width:16px;height:16px;border-radius:6px;font-size:13px;line-height:1;color:var(--dsw-alias-label-tertiary);cursor:pointer;opacity:0;transition:opacity .14s,background .14s,color .14s}',
+  '.dsh-cjg-row:hover .dsh-cjg-lit-remove{opacity:.7}',
+  '.dsh-cjg-lit-remove:hover{opacity:1;background:var(--dsw-alias-bg-layer-2);color:var(--dsw-alias-state-error-primary)}',
+  // 第四栏空状态：比别处更矮，避免一小块区域里顶着大段文字
+  '.dsh-cjg-col-lit .dsh-cjg-empty{padding:16px 14px;font-size:11px;line-height:1.75}',
+  '.dsh-cjg-col-lit .dsh-cjg-empty-mark{font-size:17px;margin-bottom:5px;color:var(--dsh-cjg-gold);opacity:.5}',
 
   // ── 右栏正文区 ──────────────────────────────────────────────────────────
   '.dsh-cjg-body{flex:1 1 auto;overflow:auto;padding:10px 14px 22px;min-height:0}',
@@ -151,8 +175,12 @@ const CSS = [
   '.dsh-cjg-switch-btn:disabled{opacity:.5;cursor:default}',
   '.dsh-cjg-switch-on{background:var(--dsh-cjg-gold-soft);color:var(--dsw-alias-label-primary);font-weight:600}',
   '.dsh-cjg-switch-btn + .dsh-cjg-switch-btn{border-left:1px solid var(--dsw-alias-border-l2)}',
-  // 列表里「已在 / 菜单显示」的标记：做成金色胶囊徽标（原来只有 5px 小点，容易看漏）
-  '.dsh-cjg-auto-dot{flex:0 0 auto;display:inline-flex;align-items:center;justify-content:center;height:15px;padding:0 6px;border-radius:999px;font-size:9.5px;font-weight:600;letter-spacing:.02em;background:var(--dsh-cjg-gold-soft);color:var(--dsh-cjg-gold);border:1px solid var(--dsh-cjg-gold-line)}',
+  // 列表里「已在 / 菜单显示」的标记：金色胶囊徽标，**可直接点击切换**。
+  // 未显示的给灰色占位「○ /」，悬停变亮 —— 这样不必点开右侧详情就能切。
+  '.dsh-cjg-auto-dot{flex:0 0 auto;display:inline-flex;align-items:center;justify-content:center;height:15px;padding:0 6px;border-radius:999px;font-size:9.5px;font-weight:600;letter-spacing:.02em;background:var(--dsh-cjg-gold-soft);color:var(--dsh-cjg-gold);border:1px solid var(--dsh-cjg-gold-line);cursor:pointer;transition:filter .14s}',
+  '.dsh-cjg-auto-dot:hover{filter:brightness(1.15)}',
+  '.dsh-cjg-auto-dot-off{flex:0 0 auto;display:inline-flex;align-items:center;justify-content:center;height:15px;padding:0 6px;border-radius:999px;font-size:9.5px;font-weight:600;letter-spacing:.02em;background:transparent;color:var(--dsw-alias-label-tertiary);border:1px solid var(--dsw-alias-border-l2);cursor:pointer;opacity:.5;transition:opacity .14s,color .14s,border-color .14s}',
+  '.dsh-cjg-row:hover .dsh-cjg-auto-dot-off{opacity:1;color:var(--dsh-cjg-gold);border-color:var(--dsh-cjg-gold-line)}',
   // 未显示的行整行压暗一档，让「已显示」的项一眼可见
   '.dsh-cjg-row-hidden .dsh-cjg-row-name{color:var(--dsw-alias-label-tertiary)}',
   '.dsh-cjg-row-hidden .dsh-cjg-ico{opacity:.35}',
@@ -441,6 +469,124 @@ function Column(props) {
 }
 
 /**
+ * 第四栏：已点亮的 skill 列表 + **自己的正文详情**（统一管理入口）。
+ *
+ * 【凭什么在这儿】第三栏是「当前子项」的本地视图，看不到别的分组里点亮了什么。
+ *   这一栏把全书的点亮项平铺出来，一眼看全、可逐项移除，点一项还能跳回去。
+ *
+ * 【上下结构】列表在上、正文在下，与左边（skill 列表 + 正文）对称。
+ *   正文只读：这里不放「复制路径 / 复制全文」那套操作（那是左边详情的事）。
+ *
+ * 【点击行为分两区】
+ *   - 点行主体 -> 跳到它所属的分组/子项并在第三栏打开（onPick）
+ *   - 点行尾的「×」-> 就地取消点亮（**不**跳转，靠 stopPropagation）
+ *
+ * @param props - { entries, activePath, detail, onPick, onRemove, busy, onClearAll }。
+ * @returns React 元素。
+ */
+function LitColumn(props) {
+  const entries = Array.isArray(props.entries) ? props.entries : []
+  const children = []
+
+  const headKids = [
+    React.createElement('span', { key: 't' }, '已点亮'),
+    React.createElement('span', { key: 's', className: 'dsh-cjg-spacer' }),
+  ]
+  if (entries.length > 0) {
+    headKids.push(React.createElement('button', {
+      key: 'c',
+      type: 'button',
+      className: 'dsh-cjg-mini',
+      disabled: props.busy === true,
+      title: '清空：把所有文件都从 / 菜单移除（书架里仍在）',
+      onClick: () => props.onClearAll(),
+    }, '清空'))
+    headKids.push(React.createElement('span', { key: 'n', className: 'dsh-cjg-count' }, String(entries.length)))
+  }
+  children.push(React.createElement('div', { key: 'h', className: 'dsh-cjg-col-head' }, headKids))
+
+  if (entries.length === 0) {
+    children.push(React.createElement('div', { key: 'e', className: 'dsh-cjg-empty' },
+      React.createElement('span', { className: 'dsh-cjg-empty-mark' }, '○'),
+      '还没有点亮的 skill。',
+      React.createElement('br'),
+      '点左边行尾的「○ /」即可加入。'))
+  } else {
+    for (const entry of entries) {
+      const on = props.activePath === entry.path
+      const kids = [
+        React.createElement('span', { key: 'i', className: 'dsh-cjg-ico' }, React.createElement(FileGlyph, null)),
+        // **只显示文件名** —— 面包屑（分组/子项）在列表里纯属噪音：
+        // 这一栏是「我挑中了哪些」，不是「它们在哪儿」。定位信息放 tooltip。
+        React.createElement('span', { key: 'n', className: 'dsh-cjg-row-name' }, entry.name),
+        React.createElement('span', {
+          key: 'r',
+          role: 'button',
+          tabIndex: 0,
+          className: 'dsh-cjg-lit-remove',
+          title: '从 / 菜单移除（书架里仍在）',
+          onClick: (event) => {
+            if (event !== null && event !== undefined && typeof event.stopPropagation === 'function') event.stopPropagation()
+            props.onRemove(entry.path)
+          },
+          onKeyDown: (event) => {
+            if (event !== null && event !== undefined && (event.key === 'Enter' || event.key === ' ')) {
+              if (typeof event.preventDefault === 'function') event.preventDefault()
+              if (typeof event.stopPropagation === 'function') event.stopPropagation()
+              props.onRemove(entry.path)
+            }
+          },
+        }, '×'),
+      ]
+      children.push(React.createElement('button', {
+        key: entry.path,
+        type: 'button',
+        className: 'dsh-cjg-row dsh-cjg-lit-row' + (on ? ' dsh-cjg-row-on' : ''),
+        title: entry.name + '\n' + entry.group + ' / ' + entry.item + '（点击跳到该位置）',
+        onClick: () => props.onPick(entry),
+      }, kids))
+    }
+  }
+
+  // 列表区（上半）+ 正文区（下半）：与左边的结构对称
+  const listBox = React.createElement('div', { className: 'dsh-cjg-lit-list' }, children)
+  const detailBox = React.createElement(LitDetail, { detail: props.detail })
+
+  return React.createElement('div', { className: 'dsh-cjg-col dsh-cjg-col-lit' },
+    listBox, detailBox)
+}
+
+/**
+ * 第四栏的正文区（只读，无操作按钮）。
+ *
+ * 【为什么不复用 SkillDetail】那边带「复制路径 / 复制全文 / 显示开关」，
+ *   放在这一栏会让「挑中的清单」变成第二个操作面板。这里只给正文。
+ * @param props - { detail } —— { skill, text, loading, error, truncated }。
+ * @returns React 元素。
+ */
+function LitDetail(props) {
+  const d = props.detail !== null && props.detail !== undefined ? props.detail : {}
+  if (d.skill === null || d.skill === undefined) {
+    return React.createElement('div', { className: 'dsh-cjg-lit-body dsh-cjg-lit-body-empty' },
+      '点上面任一项，这里显示它的正文。')
+  }
+  if (d.loading === true) {
+    return React.createElement('div', { className: 'dsh-cjg-lit-body' }, '读取中……')
+  }
+  if (typeof d.error === 'string' && d.error.length > 0) {
+    return React.createElement('div', { className: 'dsh-cjg-lit-body' },
+      React.createElement('div', { className: 'dsh-cjg-err' }, d.error))
+  }
+  return React.createElement('div', { className: 'dsh-cjg-lit-body' },
+    React.createElement('div', { className: 'dsh-cjg-lit-body-name' }, d.skill.name),
+    d.truncated === true
+      ? React.createElement('div', { className: 'dsh-cjg-note' }, '（文件较大，正文已截断显示）')
+      : null,
+    React.createElement('pre', { className: 'dsh-cjg-pre' },
+      String(d.text === undefined || d.text === null || d.text === '' ? '(空文件)' : d.text)))
+}
+
+/**
  * 设置弹窗：改书架根目录。
  *
  * 【为什么需要它】DSH 没有给插件"自动生成设置表单"的机制 —— 插件配置页
@@ -590,6 +736,16 @@ function ShelfPanel() {
     skill: null, text: '', loading: false, error: null, truncated: false,
     visible: false, switching: false,
   })
+  /**
+   * 第四栏的详情（与左边 detail **互相独立**）。
+   *
+   * 【为什么分开】第四栏点击是「跳转」而不是「在当前列表里选」：左右两边各自
+   *   有列表+正文，共用一份详情会导致点右边时左边的正文被顶掉（用户视角是
+   *   「我左边刚看的东西没了」）。分开后各管各的。
+   */
+  const [litDetail, setLitDetail] = React.useState({
+    skill: null, text: '', loading: false, error: null, truncated: false,
+  })
   const [flash, setFlash] = React.useState(null)
   /** 批量勾选（全选/全不选）进行中。 */
   const [bulkBusy, setBulkBusy] = React.useState(false)
@@ -630,6 +786,8 @@ function ShelfPanel() {
   const groups = view !== null && Array.isArray(view.groups) ? view.groups : []
   const items = view !== null && Array.isArray(view.items) ? view.items : []
   const skills = view !== null && Array.isArray(view.skills) ? view.skills : []
+  // 第四栏用的「已点亮」平铺清单（宿主按书架顺序算好）
+  const lit = state.data !== null && Array.isArray(state.data.lit) ? state.data.lit : []
 
   // 选中 skill -> 拉正文
   const openSkill = React.useCallback(async (skill) => {
@@ -670,10 +828,83 @@ function ShelfPanel() {
   }, [load])
 
   /**
-   * 切换当前 skill 是否在 `/` 菜单显示。
+   * 打开第四栏自己的详情（只拉正文，不带操作按钮）。
+   *
+   * 与 `openSkill` 分开：这里写的是 `litDetail`，不碰左边的 `detail` ——
+   * 两边各自有列表+正文，互不覆盖。
+   * @param entry - {@link litSkills} 的产物：{ name, path, group, item }。
+   */
+  const openLitDetail = React.useCallback(async (entry) => {
+    setLitDetail({ skill: entry, text: '', loading: true, error: null, truncated: false })
+    const result = await fetchSkill(entry.path)
+    if (!alive.current) return
+    if (result !== null && result.ok === true) {
+      setLitDetail({
+        skill: entry, text: String(result.text === undefined ? '' : result.text),
+        loading: false, error: null, truncated: result.truncated === true,
+      })
+    } else {
+      setLitDetail({
+        skill: entry, text: '', loading: false,
+        error: result !== null && typeof result.message === 'string' ? result.message : '读取失败。',
+        truncated: false,
+      })
+    }
+  }, [])
+
+  /**
+   * 从第四栏跳转到某个 skill：切到它所属的分组/子项，左边列表打开它，
+   * **同时**在第四栏自己的详情区显示正文。
+   *
+   * 【为什么要两步】`load(group, item)` 是异步的，第三栏的数据要等它回来才有；
+   *   所以先把选中态写进 selectionRef（`load` 完成后界面自然对齐），再 openSkill
+   *   拉正文。openSkill 不依赖第三栏列表，可以直接调。
+   * @param entry - litSkills 的产物：{ name, path, group, item }。
+   */
+  const jumpTo = React.useCallback((entry) => {
+    if (entry === null || entry === undefined) return
+    selectionRef.current = { group: entry.group, item: entry.item }
+    setSelection(selectionRef.current)
+    setFlash(null)
+    void openSkill({ name: entry.name, path: entry.path, visible: true })
+    void openLitDetail(entry)
+    void load(entry.group, entry.item)
+  }, [load, openSkill, openLitDetail])
+
+  /**
+   * 按 path 切换某个 skill 的可见性（列表行内徽标点击走这条）。
+   *
+   * 与 switchVisible 分开是因为它**不依赖 detail**：用户没点开这个文件也能切。
+   * 同样不做乐观更新 —— 写失败时显示假状态最误导人。
+   * @param path - skill 文件绝对路径。
+   * @param next - 是否在 `/` 菜单显示。
+   */
+  const toggleVisible = React.useCallback(async (path, next) => {
+    setFlash(null)
+    const result = await postVisible({ path, visible: next })
+    if (!alive.current) return
+    if (result !== null && result.ok === true) {
+      setFlash({
+        kind: 'ok',
+        text: (result.visible === true ? '已显示：打 / 时能搜到 ' : '已隐藏：打 / 时搜不到 ') + String(path).split(/[\\/]/).pop(),
+      })
+      // 同步右侧详情（如果它正显示这个文件）
+      setDetail((prev) => (
+        prev.skill !== null && prev.skill !== undefined && prev.skill.path === path
+          ? { ...prev, visible: result.visible === true }
+          : prev
+      ))
+      void load(selectionRef.current.group, selectionRef.current.item)
+    } else {
+      setFlash({ kind: 'error', text: '切换失败：' + String(result === null ? '宿主无响应' : result.message) })
+    }
+  }, [load])
+
+  /**
+   * 切换当前 skill 是否在 `/` 菜单显示（右侧详情里的开关走这条）。
    *
    * 【不乐观更新】见 postVisible 的说明：写失败时显示假状态最误导人。
-   * 写成功后重扫一次，让列表里的小圆点与头部统计跟上。
+   * 写成功后重扫一次，让列表里的徽标与头部统计跟上。
    */
   const switchVisible = React.useCallback(async (next) => {
     const skill = detail.skill
@@ -871,43 +1102,74 @@ function ShelfPanel() {
             emptyText: '这个分组下还没有子文件夹。',
           }),
           React.createElement('div', { className: 'dsh-cjg-col dsh-cjg-col-r' },
-            React.createElement('div', { className: 'dsh-cjg-col-head' },
-              React.createElement('span', null, 'skill'),
-              React.createElement('span', { className: 'dsh-cjg-spacer' }),
-              skills.length > 0
-                ? React.createElement('span', { className: 'dsh-cjg-count' }, String(skills.length))
-                : null),
-            React.createElement('div', { className: 'dsh-cjg-list-top' },
-              skills.length === 0
-                ? React.createElement('div', { className: 'dsh-cjg-empty' },
-                  React.createElement('span', { className: 'dsh-cjg-empty-mark' }, '∘'),
-                  '这个子项下还没有 skill 文件（支持 .md / .markdown / .txt）。')
-                : skills.map((skill) => {
-                  const on = detail.skill !== null && detail.skill !== undefined && detail.skill.path === skill.path
-                  const shown = skill.visible === true
-                  return React.createElement('button', {
-                    key: skill.path,
-                    type: 'button',
-                    className: 'dsh-cjg-row' + (on ? ' dsh-cjg-row-on' : '') + (shown ? '' : ' dsh-cjg-row-hidden'),
-                    title: shown ? skill.name + '（已在 / 菜单显示）' : skill.name + '（不在 / 菜单显示）',
-                    onClick: () => { void openSkill(skill) },
-                  },
-                  React.createElement('span', { className: 'dsh-cjg-ico' }, React.createElement(FileGlyph, null)),
-                  React.createElement('span', { className: 'dsh-cjg-row-name' }, skill.name),
-                  shown
-                    ? React.createElement('span', { className: 'dsh-cjg-auto-dot' }, '✓ /')
-                    : null)
-                })),
-            React.createElement('div', { className: 'dsh-cjg-body' },
-              flash === null ? null : React.createElement('div', {
-                className: flash.kind === 'error' ? 'dsh-cjg-err' : 'dsh-cjg-note',
-              }, flash.text),
-              React.createElement(SkillDetail, {
-                skill: detail.skill, text: detail.text, loading: detail.loading,
-                error: detail.error, truncated: detail.truncated, onCopy: copy,
-                visible: detail.visible, switching: detail.switching,
-                onVisible: (next) => { void switchVisible(next) },
-              })))),
+            // 左右两半，各自「列表在上 / 正文在下」——
+            // 点第四栏条目时正文显示在**它自己那边**，不会顶掉左边的正文。
+            React.createElement('div', { className: 'dsh-cjg-half' },
+                React.createElement('div', { className: 'dsh-cjg-col-head' },
+                  React.createElement('span', null, 'skill'),
+                  React.createElement('span', { className: 'dsh-cjg-spacer' }),
+                  skills.length > 0
+                    ? React.createElement('span', { className: 'dsh-cjg-count' }, String(skills.length))
+                    : null),
+                React.createElement('div', { className: 'dsh-cjg-list' },
+                  skills.length === 0
+                    ? React.createElement('div', { className: 'dsh-cjg-empty' },
+                      React.createElement('span', { className: 'dsh-cjg-empty-mark' }, '∘'),
+                      '这个子项下还没有 skill 文件（支持 .md / .markdown / .txt）。')
+                    : skills.map((skill) => {
+                      const on = detail.skill !== null && detail.skill !== undefined && detail.skill.path === skill.path
+                      const shown = skill.visible === true
+                      return React.createElement('button', {
+                        key: skill.path,
+                        type: 'button',
+                        className: 'dsh-cjg-row' + (on ? ' dsh-cjg-row-on' : '') + (shown ? '' : ' dsh-cjg-row-hidden'),
+                        title: shown ? skill.name + '（已在 / 菜单显示）' : skill.name + '（不在 / 菜单显示）',
+                        onClick: () => { void openSkill(skill) },
+                      },
+                      React.createElement('span', { className: 'dsh-cjg-ico' }, React.createElement(FileGlyph, null)),
+                      React.createElement('span', { className: 'dsh-cjg-row-name' }, skill.name),
+                      // 徽标本身就是开关：点它切换显示/不显示，**不**触发行点击。
+                      // 【为什么是 span 而不是 button】行本身就是 <button>，HTML 不允许
+                      //   嵌套 button；所以这里用 span + role/tabIndex 并拦掉冒泡。
+                      React.createElement('span', {
+                        role: 'button',
+                        tabIndex: 0,
+                        className: shown ? 'dsh-cjg-auto-dot' : 'dsh-cjg-auto-dot-off',
+                        title: shown ? '点击：从 / 菜单移除（书架里仍在）' : '点击：加入 / 菜单',
+                        onClick: (event) => {
+                          if (event !== null && event !== undefined && typeof event.stopPropagation === 'function') event.stopPropagation()
+                          void toggleVisible(skill.path, !shown)
+                        },
+                        onKeyDown: (event) => {
+                          if (event !== null && event !== undefined && (event.key === 'Enter' || event.key === ' ')) {
+                            if (typeof event.preventDefault === 'function') event.preventDefault()
+                            if (typeof event.stopPropagation === 'function') event.stopPropagation()
+                            void toggleVisible(skill.path, !shown)
+                          }
+                        },
+                      }, shown ? '✓ /' : '○ /'))
+                    })),
+              // 左半的正文区（属于左边列表）
+              React.createElement('div', { className: 'dsh-cjg-body' },
+                flash === null ? null : React.createElement('div', {
+                  className: flash.kind === 'error' ? 'dsh-cjg-err' : 'dsh-cjg-note',
+                }, flash.text),
+                React.createElement(SkillDetail, {
+                  skill: detail.skill, text: detail.text, loading: detail.loading,
+                  error: detail.error, truncated: detail.truncated, onCopy: copy,
+                  visible: detail.visible, switching: detail.switching,
+                  onVisible: (next) => { void switchVisible(next) },
+                }))),
+            // 第四栏：已点亮（列表 + 自己的只读正文，与左边互不覆盖）
+            React.createElement(LitColumn, {
+              entries: lit,
+              activePath: litDetail.skill !== null && litDetail.skill !== undefined ? litDetail.skill.path : null,
+              detail: litDetail,
+              onPick: jumpTo,
+              onRemove: (path) => { void toggleVisible(path, false) },
+              busy: bulkBusy,
+              onClearAll: () => { void bulkVisible(false, 'all') },
+            }))),
     settingsOpen === null ? null : React.createElement(SettingsDialog, {
       info: settingsOpen,
       busy: savingSettings,
@@ -1027,6 +1289,29 @@ function makeSource(rootCtx) {
      */
     openReference() {
       return false
+    },
+    /**
+     * 引用编解码器 —— **必须提供，否则发送时直接报错**。
+     *
+     * 【真实故障】没有 codec 时，发送带引用的草稿会抛：
+     *     slash: no serializer for reference source "cangjingge"
+     *   来源（asar 内 dsh 的 input-trigger 实现）：
+     *     const owner = roster.all().find((s) => s.name === source)
+     *     if (owner?.codec === void 0) reject(new Error(`slash: no serializer ...`))
+     *   也就是**提交那一刻**才要，所以插入时看着正常、一发送就失败 ——
+     *   症状极具误导性（会以为「发不出去」是别的问题）。
+     *
+     * 【回传什么】我们的 ref 就是 skill 的绝对路径，所以两个方法都直接回传它：
+     *   - serialize     -> 模型看到的文本（路径，Lead 可直接 read）
+     *   - clipboardText -> 复制/持久化时的文本（同样用路径，便于粘贴）
+     */
+    codec: {
+      clipboardText(ref) {
+        return typeof ref === 'string' ? ref : ''
+      },
+      async serialize(ref) {
+        return typeof ref === 'string' ? ref : ''
+      },
     },
   }
 }

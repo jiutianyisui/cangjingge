@@ -20,6 +20,7 @@ import {
   isVisible,
   withVisible,
   visibleSkills,
+  litSkills,
   SETTINGS_FILE_NAME,
   normalizeSettings,
   pickLibraryDir,
@@ -185,6 +186,38 @@ eq(normalizeVisible({ skills: [] }).skills, {}, 'skills 是数组 -> 空')
   s = withVisible(s, '/b.md', true)
   s = withVisible(s, '/a.md', true)
   eq(visibleSkills(s), ['/a.md', '/b.md'], '可见清单已排序')
+}
+
+// ---- 第四栏：已点亮项按书架顺序平铺 ---------------------------------------------
+{
+  const tree = {
+    groups: [
+      { name: '团队', items: [{ name: '编制', skills: [{ name: '规程.md', path: '/t/规程.md' }, { name: '别的.md', path: '/t/别的.md' }] }] },
+      { name: '兵法', items: [{ name: '谋', skills: [{ name: '孙子.md', path: '/b/孙子.md' }] }] },
+    ],
+  }
+  let s = normalizeVisible(null)
+  eq(litSkills(tree, s), [], '一个都没点亮 -> 空')
+
+  s = withVisible(s, '/b/孙子.md', true)
+  s = withVisible(s, '/t/规程.md', true)
+  const lit = litSkills(tree, s)
+  eq(lit.length, 2, '列出两个已点亮项')
+  // **书架顺序**：团队在前、兵法在后（不是按路径字母序，那样两组会交错）
+  eq(lit[0].name, '规程.md', '第一项来自前面的分组')
+  eq(lit[1].name, '孙子.md', '第二项来自后面的分组')
+  // 每项都带定位信息，第四栏点击跳转要用
+  eq(lit[0].group, '团队', '带分组名')
+  eq(lit[0].item, '编制', '带子项名')
+  eq(lit[1].group, '兵法', '第二项带分组名')
+
+  // 同子项内多个点亮时，保持文件在原列表里的顺序
+  s = withVisible(s, '/t/别的.md', true)
+  const lit2 = litSkills(tree, s)
+  eq(lit2.map((x) => x.name), ['规程.md', '别的.md', '孙子.md'], '同组内按文件原序')
+
+  eq(litSkills(null, s), [], 'null 树 -> 空')
+  eq(litSkills({ groups: [] }, s), [], '空分组 -> 空')
 }
 
 // ---- 候选行的关键词过滤 --------------------------------------------------------

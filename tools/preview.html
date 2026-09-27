@@ -1,0 +1,154 @@
+<!doctype html><html><head><meta charset="utf-8"><style>
+:root{
+  --dsw-alias-bg-base:#1b1b1d;
+  --dsw-alias-bg-layer-1:#232325;
+  --dsw-alias-bg-layer-2:#2b2b2e;
+  --dsw-alias-bg-overlay:#1c1c1f;
+  --dsw-alias-label-primary:#e8e6e3;
+  --dsw-alias-label-secondary:#b3b0ab;
+  --dsw-alias-label-tertiary:#807d78;
+  --dsw-alias-border-l1:#333336;
+  --dsw-alias-border-l2:#44444a;
+  --dsw-alias-brand-primary:#c9a227;
+  --dsw-alias-state-error-primary:#e5534b;
+  --dsw-specific-font-family-code:'Cascadia Code',Consolas,monospace;
+}
+:root{--dsh-cjg-gold:#c9a227;--dsh-cjg-gold-soft:rgba(201,162,39,.14);--dsh-cjg-gold-line:rgba(201,162,39,.42)}.dsh-cjg-root{position:relative;display:flex;flex-direction:column;height:100%;min-height:0;background:var(--dsw-alias-bg-base);color:var(--dsw-alias-label-primary);font-size:13px;line-height:1.55;overflow:hidden}.dsh-cjg-root::before{content:"";position:absolute;inset:0;pointer-events:none;background:radial-gradient(120% 62% at 50% -14%,var(--dsh-cjg-gold-soft),transparent 62%)}.dsh-cjg-head{position:relative;z-index:1;display:flex;align-items:center;gap:9px;padding:11px 14px;border-bottom:1px solid var(--dsw-alias-border-l1);flex:0 0 auto}.dsh-cjg-brand{display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;flex:0 0 auto;border-radius:7px;background:linear-gradient(160deg,var(--dsh-cjg-gold-line),transparent 70%);color:var(--dsh-cjg-gold)}.dsh-cjg-title{font-weight:600;font-size:13px;letter-spacing:.02em}.dsh-cjg-sub{color:var(--dsw-alias-label-tertiary);font-size:10.5px;max-width:38vw;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;direction:rtl;text-align:left}.dsh-cjg-spacer{flex:1 1 auto}.dsh-cjg-btn{display:inline-flex;align-items:center;gap:4px;border:1px solid var(--dsw-alias-border-l2);background:transparent;color:var(--dsw-alias-label-primary);border-radius:8px;padding:4px 10px;font-size:11px;cursor:pointer;font-family:inherit;transition:background .14s,border-color .14s,transform .08s,color .14s}.dsh-cjg-btn:hover{background:var(--dsw-alias-bg-layer-2);border-color:var(--dsh-cjg-gold-line)}.dsh-cjg-btn:active{transform:translateY(1px)}.dsh-cjg-btn:disabled{opacity:.45;cursor:default}.dsh-cjg-btn-primary{border-color:var(--dsh-cjg-gold-line);background:var(--dsh-cjg-gold-soft)}.dsh-cjg-btn-primary:hover{background:var(--dsh-cjg-gold-soft);border-color:var(--dsh-cjg-gold)}.dsh-cjg-cols{position:relative;z-index:1;flex:1 1 auto;display:flex;min-height:0;min-width:0;gap:0}.dsh-cjg-col{display:flex;flex-direction:column;min-height:0;min-width:0}.dsh-cjg-col-l{flex:0 0 clamp(118px,15vw,162px)}.dsh-cjg-col-m,.dsh-cjg-col-r{border-left:1px solid var(--dsw-alias-border-l1)}.dsh-cjg-col-m{flex:0 0 clamp(118px,15vw,162px)}.dsh-cjg-col-r{flex:1 1 auto;flex-direction:row}.dsh-cjg-half{display:flex;flex-direction:column;min-height:0;min-width:0;flex:1 1 50%}.dsh-cjg-col-lit{position:relative;display:flex;flex-direction:column;flex:1 1 50%;min-height:0;min-width:0;border-left:1px solid var(--dsw-alias-border-l1);background:linear-gradient(180deg,var(--dsh-cjg-gold-soft),transparent 38%)}.dsh-cjg-col-lit::before{content:"";position:absolute;left:-1px;top:0;bottom:0;width:1px;background:linear-gradient(180deg,var(--dsh-cjg-gold-line),transparent 60%);pointer-events:none}.dsh-cjg-lit-list{flex:0 1 auto;max-height:55%;min-height:0;overflow-y:auto;padding:0 8px 8px}.dsh-cjg-lit-body{flex:1 1 auto;min-height:0;overflow:auto;padding:9px 12px 16px;border-top:1px solid var(--dsw-alias-border-l1);font-size:11.5px;line-height:1.7}.dsh-cjg-lit-body-empty{display:flex;align-items:center;justify-content:center;padding:16px 12px;text-align:center;color:var(--dsw-alias-label-tertiary);font-size:11px}.dsh-cjg-lit-body-name{font-weight:600;font-size:12px;margin-bottom:6px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.dsh-cjg-col-head{flex:0 0 auto;display:flex;align-items:center;gap:5px;padding:9px 12px 6px;font-size:10px;font-weight:600;letter-spacing:.06em;color:var(--dsw-alias-label-tertiary)}.dsh-cjg-col-lit .dsh-cjg-col-head{color:var(--dsh-cjg-gold)}.dsh-cjg-count{font-weight:400;letter-spacing:0;opacity:.75}.dsh-cjg-list{flex:1 1 auto;overflow-y:auto;padding:0 8px 12px;min-height:0}.dsh-cjg-row{position:relative;display:flex;align-items:center;gap:7px;width:100%;text-align:left;border:1px solid transparent;background:transparent;color:inherit;border-radius:9px;padding:6px 9px;margin-bottom:3px;cursor:pointer;font-family:inherit;font-size:12px;line-height:1.4;transition:background .14s,border-color .14s,transform .1s,box-shadow .14s}.dsh-cjg-row:hover{background:var(--dsw-alias-bg-layer-1);border-color:var(--dsw-alias-border-l1);transform:translateX(2px)}.dsh-cjg-row-on{background:linear-gradient(90deg,var(--dsh-cjg-gold-soft),transparent 86%);border-color:var(--dsh-cjg-gold-line);box-shadow:inset 0 0 0 1px rgba(201,162,39,.06)}.dsh-cjg-row-on::before{content:"";position:absolute;left:0;top:20%;bottom:20%;width:2px;border-radius:2px;background:var(--dsh-cjg-gold);box-shadow:0 0 6px var(--dsh-cjg-gold-line)}.dsh-cjg-row-on .dsh-cjg-ico{color:var(--dsh-cjg-gold);opacity:1}.dsh-cjg-row-on .dsh-cjg-row-name{font-weight:600}.dsh-cjg-ico{flex:0 0 auto;display:inline-flex;align-items:center;justify-content:center;width:13px;height:13px;opacity:.62;transition:opacity .14s}.dsh-cjg-row:hover .dsh-cjg-ico,.dsh-cjg-row-on .dsh-cjg-ico{opacity:1}.dsh-cjg-row-name{flex:1 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.dsh-cjg-count-chip{flex:0 0 auto;font-size:9.5px;min-width:15px;text-align:center;padding:1px 5px;border-radius:999px;background:var(--dsw-alias-bg-layer-2);color:var(--dsw-alias-label-tertiary)}.dsh-cjg-row-on .dsh-cjg-count-chip{background:var(--dsh-cjg-gold-soft);color:var(--dsh-cjg-gold)}.dsh-cjg-lit-row{padding:5px 8px;margin-bottom:2px}.dsh-cjg-lit-remove{flex:0 0 auto;display:inline-flex;align-items:center;justify-content:center;width:16px;height:16px;border-radius:6px;font-size:13px;line-height:1;color:var(--dsw-alias-label-tertiary);cursor:pointer;opacity:0;transition:opacity .14s,background .14s,color .14s}.dsh-cjg-row:hover .dsh-cjg-lit-remove{opacity:.7}.dsh-cjg-lit-remove:hover{opacity:1;background:var(--dsw-alias-bg-layer-2);color:var(--dsw-alias-state-error-primary)}.dsh-cjg-col-lit .dsh-cjg-empty{padding:16px 14px;font-size:11px;line-height:1.75}.dsh-cjg-col-lit .dsh-cjg-empty-mark{font-size:17px;margin-bottom:5px;color:var(--dsh-cjg-gold);opacity:.5}.dsh-cjg-body{flex:1 1 auto;overflow:auto;padding:10px 14px 22px;min-height:0}.dsh-cjg-empty{padding:26px 18px;text-align:center;color:var(--dsw-alias-label-tertiary);font-size:12px;line-height:1.85}.dsh-cjg-empty-mark{display:block;font-size:22px;line-height:1;margin-bottom:8px;opacity:.35}.dsh-cjg-err{margin:8px 2px;padding:9px 11px;border-radius:9px;font-size:11px;color:var(--dsw-alias-state-error-primary);border:1px solid var(--dsw-alias-state-error-primary);background:var(--dsw-alias-bg-layer-1);white-space:pre-wrap;word-break:break-word}.dsh-cjg-note{margin:8px 2px;font-size:11px;color:var(--dsw-alias-label-tertiary);white-space:pre-wrap;word-break:break-word}.dsh-cjg-skill-head{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:4px}.dsh-cjg-skill-name{font-weight:600;font-size:14px;letter-spacing:.01em;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.dsh-cjg-path{font-family:var(--dsw-specific-font-family-code),monospace;font-size:10px;color:var(--dsw-alias-label-tertiary);word-break:break-all;margin-bottom:10px;opacity:.85}.dsh-cjg-paper{position:relative;margin-top:10px;padding:12px 14px;border-radius:10px;background:var(--dsw-alias-bg-layer-2);border:1px solid var(--dsw-alias-border-l1);box-shadow:inset 0 1px 0 rgba(255,255,255,.03)}.dsh-cjg-paper::before{content:"";position:absolute;left:0;top:12px;bottom:12px;width:2px;border-radius:2px;background:var(--dsh-cjg-gold-line);opacity:.5}.dsh-cjg-pre{margin:0;overflow:auto;background:transparent;font-family:var(--dsw-specific-font-family-code),monospace;font-size:11.5px;line-height:1.7;white-space:pre-wrap;word-break:break-word;max-height:52vh}.dsh-cjg-actions{margin-top:11px;display:flex;gap:7px;flex-wrap:wrap;align-items:center}.dsh-cjg-hint{margin-top:11px;padding:8px 11px;border-radius:9px;font-size:11px;color:var(--dsw-alias-label-secondary);background:var(--dsw-alias-bg-layer-1);border:1px dashed var(--dsh-cjg-gold-line);line-height:1.65}.dsh-cjg-kbd{display:inline-block;padding:0 5px;border-radius:5px;font-family:var(--dsw-specific-font-family-code),monospace;font-size:10.5px;color:var(--dsh-cjg-gold);border:1px solid var(--dsh-cjg-gold-line);background:var(--dsh-cjg-gold-soft)}.dsh-cjg-switch{display:inline-flex;align-items:center;gap:0;border:1px solid var(--dsw-alias-border-l2);border-radius:9px;overflow:hidden;flex:0 0 auto}.dsh-cjg-switch-btn{border:0;background:transparent;color:var(--dsw-alias-label-secondary);font-family:inherit;font-size:11px;padding:4px 11px;cursor:pointer;transition:background .14s,color .14s}.dsh-cjg-switch-btn:hover:not(:disabled){background:var(--dsw-alias-bg-layer-2)}.dsh-cjg-switch-btn:disabled{opacity:.5;cursor:default}.dsh-cjg-switch-on{background:var(--dsh-cjg-gold-soft);color:var(--dsw-alias-label-primary);font-weight:600}.dsh-cjg-switch-btn + .dsh-cjg-switch-btn{border-left:1px solid var(--dsw-alias-border-l2)}.dsh-cjg-auto-dot{flex:0 0 auto;display:inline-flex;align-items:center;justify-content:center;height:15px;padding:0 6px;border-radius:999px;font-size:9.5px;font-weight:600;letter-spacing:.02em;background:var(--dsh-cjg-gold-soft);color:var(--dsh-cjg-gold);border:1px solid var(--dsh-cjg-gold-line);cursor:pointer;transition:filter .14s}.dsh-cjg-auto-dot:hover{filter:brightness(1.15)}.dsh-cjg-auto-dot-off{flex:0 0 auto;display:inline-flex;align-items:center;justify-content:center;height:15px;padding:0 6px;border-radius:999px;font-size:9.5px;font-weight:600;letter-spacing:.02em;background:transparent;color:var(--dsw-alias-label-tertiary);border:1px solid var(--dsw-alias-border-l2);cursor:pointer;opacity:.5;transition:opacity .14s,color .14s,border-color .14s}.dsh-cjg-row:hover .dsh-cjg-auto-dot-off{opacity:1;color:var(--dsh-cjg-gold);border-color:var(--dsh-cjg-gold-line)}.dsh-cjg-row-hidden .dsh-cjg-row-name{color:var(--dsw-alias-label-tertiary)}.dsh-cjg-row-hidden .dsh-cjg-ico{opacity:.35}.dsh-cjg-mode-row{display:flex;align-items:center;gap:9px;margin-top:11px;flex-wrap:wrap}.dsh-cjg-mode-label{font-size:11px;color:var(--dsw-alias-label-tertiary)}.dsh-cjg-mini{flex:0 0 auto;border:1px solid var(--dsw-alias-border-l2);background:transparent;color:var(--dsw-alias-label-secondary);font-family:inherit;font-size:10px;padding:2px 7px;border-radius:6px;cursor:pointer;transition:background .14s,color .14s}.dsh-cjg-mini:hover:not(:disabled){background:var(--dsw-alias-bg-layer-2);color:var(--dsw-alias-label-primary)}.dsh-cjg-mini:disabled{opacity:.45;cursor:default}.dsh-cjg-icon{display:inline-flex;align-items:center;justify-content:center;transition:transform .16s}.dsh-cjg-icon-active{color:var(--dsh-cjg-gold)}.dsh-cjg-modal-mask{position:fixed;inset:0;z-index:50;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,.42)}.dsh-cjg-modal{width:min(380px,88vw);padding:14px 16px;border-radius:12px;background:var(--dsw-alias-bg-overlay,#1c1c1f);border:1px solid var(--dsw-alias-border-l2);box-shadow:0 18px 44px rgba(0,0,0,.42)}.dsh-cjg-modal-title{font-weight:600;font-size:13px;margin-bottom:8px}.dsh-cjg-input{display:block;width:100%;box-sizing:border-box;padding:5px 8px;font-size:12px;font-family:inherit;color:var(--dsw-alias-label-primary);background:var(--dsw-alias-bg-layer-1);border:1px solid var(--dsw-alias-border-l2);border-radius:8px;outline:none;margin-bottom:10px}.dsh-cjg-input:focus{border-color:var(--dsh-cjg-gold-line)}.dsh-cjg-modal-actions{display:flex;gap:6px;margin-top:4px}.dsh-cjg-modal .dsh-cjg-input{margin-bottom:6px}.dsh-cjg-field-hint{display:block;font-size:10.5px;color:var(--dsw-alias-label-tertiary);line-height:1.6;margin-bottom:10px}.dsh-cjg-effective{padding:7px 10px;border-radius:8px;background:var(--dsw-alias-bg-layer-1);border:1px solid var(--dsw-alias-border-l1);font-size:11px;line-height:1.7;margin-bottom:10px;word-break:break-all}.dsh-cjg-effective-k{color:var(--dsw-alias-label-tertiary);margin-right:5px}.dsh-cjg-effective-v{font-family:var(--dsw-specific-font-family-code),monospace;color:var(--dsw-alias-label-primary)}.dsh-cjg-badge{display:inline-block;padding:0 6px;border-radius:999px;font-size:10px;border:1px solid var(--dsh-cjg-gold-line);color:var(--dsh-cjg-gold);background:var(--dsh-cjg-gold-soft)}.dsh-cjg-list::-webkit-scrollbar,.dsh-cjg-list-top::-webkit-scrollbar,.dsh-cjg-body::-webkit-scrollbar,.dsh-cjg-pre::-webkit-scrollbar{width:7px;height:7px}.dsh-cjg-list::-webkit-scrollbar-thumb,.dsh-cjg-list-top::-webkit-scrollbar-thumb,.dsh-cjg-body::-webkit-scrollbar-thumb,.dsh-cjg-pre::-webkit-scrollbar-thumb{background:var(--dsw-alias-border-l2);border-radius:999px}.dsh-cjg-list::-webkit-scrollbar-thumb:hover,.dsh-cjg-list-top::-webkit-scrollbar-thumb:hover,.dsh-cjg-body::-webkit-scrollbar-thumb:hover,.dsh-cjg-pre::-webkit-scrollbar-thumb:hover{background:var(--dsh-cjg-gold-line)}.dsh-cjg-list::-webkit-scrollbar-track,.dsh-cjg-list-top::-webkit-scrollbar-track,.dsh-cjg-body::-webkit-scrollbar-track,.dsh-cjg-pre::-webkit-scrollbar-track{background:transparent}
+html,body{margin:0;height:100%;}
+body{background:#1b1b1d}
+.dsh-cjg-root{height:100%}
+</style></head><body>
+<div class="dsh-cjg-root">
+  <div class="dsh-cjg-head">
+    <span class="dsh-cjg-brand"><svg viewBox="0 0 20 20" width="14" height="14" aria-hidden="true"><path d="M10 2.1 L18.2 8.6 L16.9 10.2 L10 4.8 L3.1 10.2 L1.8 8.6 Z" fill="currentColor"/><path d="M4 10.6 L16 10.6 L16 18 L4 18 Z" fill="currentColor" opacity="0.55"/><rect x="8.4" y="12.6" width="3.2" height="3.6" rx="0.4" fill="#1b1b1d"/></svg></span>
+    <span class="dsh-cjg-title">藏经阁</span>
+    <span class="dsh-cjg-sub">E:\xiangmu\chajian\藏经阁</span>
+    <span class="dsh-cjg-spacer"></span>
+    <button class="dsh-cjg-btn">重新扫描</button>
+  </div>
+  <div class="dsh-cjg-cols">
+    <div class="dsh-cjg-col dsh-cjg-col-l">
+      <div class="dsh-cjg-list">
+        <div class="dsh-cjg-col-head"><span>分组</span><span class="dsh-cjg-spacer"></span><span class="dsh-cjg-count">3</span></div>
+        <button class="dsh-cjg-row">
+    <span class="dsh-cjg-ico"><svg viewBox="0 0 16 16" width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round" stroke-linecap="round"><path d="M1.6 3.6 h4.2 l1.3 1.7 h7.3 v6.9 a.8.8 0 0 1 -.8.8 h-11.2 a.8.8 0 0 1 -.8-.8 z"/></svg></span>
+    <span class="dsh-cjg-row-name">经部</span>
+    <span class="dsh-cjg-count-chip">2</span>
+  </button>
+        <button class="dsh-cjg-row dsh-cjg-row-on">
+    <span class="dsh-cjg-ico"><svg viewBox="0 0 16 16" width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round" stroke-linecap="round"><path d="M1.6 3.6 h4.2 l1.3 1.7 h7.3 v6.9 a.8.8 0 0 1 -.8.8 h-11.2 a.8.8 0 0 1 -.8-.8 z"/></svg></span>
+    <span class="dsh-cjg-row-name">史部</span>
+    <span class="dsh-cjg-count-chip">1</span>
+  </button>
+        <button class="dsh-cjg-row">
+    <span class="dsh-cjg-ico"><svg viewBox="0 0 16 16" width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round" stroke-linecap="round"><path d="M1.6 3.6 h4.2 l1.3 1.7 h7.3 v6.9 a.8.8 0 0 1 -.8.8 h-11.2 a.8.8 0 0 1 -.8-.8 z"/></svg></span>
+    <span class="dsh-cjg-row-name">子部</span>
+    <span class="dsh-cjg-count-chip">4</span>
+  </button>
+      </div>
+    </div>
+    <div class="dsh-cjg-col dsh-cjg-col-m">
+      <div class="dsh-cjg-list">
+        <div class="dsh-cjg-col-head"><span>子项</span><span class="dsh-cjg-spacer"></span><span class="dsh-cjg-count">3</span></div>
+        <button class="dsh-cjg-row dsh-cjg-row-on">
+    <span class="dsh-cjg-ico"><svg viewBox="0 0 16 16" width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round" stroke-linecap="round"><path d="M1.6 3.6 h4.2 l1.3 1.7 h7.3 v6.9 a.8.8 0 0 1 -.8.8 h-11.2 a.8.8 0 0 1 -.8-.8 z"/></svg></span>
+    <span class="dsh-cjg-row-name">正史</span>
+    <span class="dsh-cjg-count-chip">2</span>
+  </button>
+        <button class="dsh-cjg-row">
+    <span class="dsh-cjg-ico"><svg viewBox="0 0 16 16" width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round" stroke-linecap="round"><path d="M1.6 3.6 h4.2 l1.3 1.7 h7.3 v6.9 a.8.8 0 0 1 -.8.8 h-11.2 a.8.8 0 0 1 -.8-.8 z"/></svg></span>
+    <span class="dsh-cjg-row-name">编年</span>
+    <span class="dsh-cjg-count-chip">1</span>
+  </button>
+        <button class="dsh-cjg-row">
+    <span class="dsh-cjg-ico"><svg viewBox="0 0 16 16" width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round" stroke-linecap="round"><path d="M1.6 3.6 h4.2 l1.3 1.7 h7.3 v6.9 a.8.8 0 0 1 -.8.8 h-11.2 a.8.8 0 0 1 -.8-.8 z"/></svg></span>
+    <span class="dsh-cjg-row-name">杂记</span>
+    <span class="dsh-cjg-count-chip">3</span>
+  </button>
+      </div>
+    </div>
+    <div class="dsh-cjg-col dsh-cjg-col-r">
+      <div class="dsh-cjg-half">
+        <div class="dsh-cjg-col-head"><span>skill</span><span class="dsh-cjg-spacer"></span><span class="dsh-cjg-count">3</span></div>
+        <div class="dsh-cjg-list">
+          <button class="dsh-cjg-row dsh-cjg-row-on">
+    <span class="dsh-cjg-ico"><svg viewBox="0 0 16 16" width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round" stroke-linecap="round"><path d="M3.4 1.9 h5.6 l3.6 3.6 v8.6 a.8.8 0 0 1 -.8.8 h-8.4 a.8.8 0 0 1 -.8-.8 z"/><path d="M9 1.9 v3.6 h3.6"/></svg></span>
+    <span class="dsh-cjg-row-name">史记.md</span>
+    <span class="dsh-cjg-auto-dot">✓ /</span>
+  </button>
+          <button class="dsh-cjg-row dsh-cjg-row-hidden">
+    <span class="dsh-cjg-ico"><svg viewBox="0 0 16 16" width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round" stroke-linecap="round"><path d="M3.4 1.9 h5.6 l3.6 3.6 v8.6 a.8.8 0 0 1 -.8.8 h-8.4 a.8.8 0 0 1 -.8-.8 z"/><path d="M9 1.9 v3.6 h3.6"/></svg></span>
+    <span class="dsh-cjg-row-name">汉书.md</span>
+    <span class="dsh-cjg-auto-dot-off">○ /</span>
+  </button>
+          <button class="dsh-cjg-row dsh-cjg-row-hidden">
+    <span class="dsh-cjg-ico"><svg viewBox="0 0 16 16" width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round" stroke-linecap="round"><path d="M3.4 1.9 h5.6 l3.6 3.6 v8.6 a.8.8 0 0 1 -.8.8 h-8.4 a.8.8 0 0 1 -.8-.8 z"/><path d="M9 1.9 v3.6 h3.6"/></svg></span>
+    <span class="dsh-cjg-row-name">后汉书.markdown</span>
+    <span class="dsh-cjg-auto-dot-off">○ /</span>
+  </button>
+        </div>
+        <div class="dsh-cjg-body">
+        <div class="dsh-cjg-skill-head">
+          <span class="dsh-cjg-ico" style="opacity:1;color:var(--dsh-cjg-gold)"><svg viewBox="0 0 16 16" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round" stroke-linecap="round"><path d="M3.4 1.9 h5.6 l3.6 3.6 v8.6 a.8.8 0 0 1 -.8.8 h-8.4 a.8.8 0 0 1 -.8-.8 z"/><path d="M9 1.9 v3.6 h3.6"/></svg></span>
+          <span class="dsh-cjg-skill-name">史记.md</span>
+        </div>
+        <div class="dsh-cjg-path">E:\xiangmu\chajian\藏经阁\史部\正史\史记.md</div>
+        <div class="dsh-cjg-actions">
+          <button class="dsh-cjg-btn">复制路径</button>
+          <button class="dsh-cjg-btn dsh-cjg-btn-primary">复制全文</button>
+        </div>
+        <div class="dsh-cjg-hint">在聊天输入框里打 <span class="dsh-cjg-kbd">/</span>　打开菜单 → 选「藏经阁」→ 挑这个 skill，即可插入当前对话。</div>
+        <div class="dsh-cjg-paper"><pre class="dsh-cjg-pre"># 史记
+
+太史公曰：余读谍记，黄帝以来皆有年数。
+稽其历谱谍终始五德之传，古文咸不同，乖异。
+夫子之弗论次其年月，岂虚哉！
+
+于是以五帝系谍、尚书集世纪黄帝以来讫共和为世表。</pre></div>
+        </div>
+      </div>
+      <div class="dsh-cjg-col-lit">
+        <div class="dsh-cjg-lit-list">
+          <div class="dsh-cjg-col-head"><span>已点亮</span><span class="dsh-cjg-spacer"></span><button class="dsh-cjg-mini">清空</button><span class="dsh-cjg-count">2</span></div>
+          <button class="dsh-cjg-row dsh-cjg-lit-row dsh-cjg-row-on">
+    <span class="dsh-cjg-ico"><svg viewBox="0 0 16 16" width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round" stroke-linecap="round"><path d="M3.4 1.9 h5.6 l3.6 3.6 v8.6 a.8.8 0 0 1 -.8.8 h-8.4 a.8.8 0 0 1 -.8-.8 z"/><path d="M9 1.9 v3.6 h3.6"/></svg></span>
+    <span class="dsh-cjg-row-name">史记.md</span>
+    <span class="dsh-cjg-lit-remove">×</span>
+  </button>
+          <button class="dsh-cjg-row dsh-cjg-lit-row">
+    <span class="dsh-cjg-ico"><svg viewBox="0 0 16 16" width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round" stroke-linecap="round"><path d="M3.4 1.9 h5.6 l3.6 3.6 v8.6 a.8.8 0 0 1 -.8.8 h-8.4 a.8.8 0 0 1 -.8-.8 z"/><path d="M9 1.9 v3.6 h3.6"/></svg></span>
+    <span class="dsh-cjg-row-name">论语.md</span>
+    <span class="dsh-cjg-lit-remove">×</span>
+  </button>
+        </div>
+        <div class="dsh-cjg-lit-body">
+          <div class="dsh-cjg-lit-body-name">史记.md</div>
+          <pre class="dsh-cjg-pre"># 史记
+
+太史公曰：余读谍记，黄帝以来皆有年数。
+稽其历谱谍终始五德之传，古文咸不同，乖异。</pre>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+<div class="dsh-cjg-modal-mask" style="display:none">
+  <div class="dsh-cjg-modal">
+    <div class="dsh-cjg-modal-title">藏经阁 · 设置</div>
+    <div class="dsh-cjg-effective">
+      <div><span class="dsh-cjg-effective-k">当前扫描</span><span class="dsh-cjg-badge">内置默认</span></div>
+      <div class="dsh-cjg-effective-v">C:\Users\Administrator\.dsh\cangjingge</div>
+    </div>
+    <label>
+      <span class="dsh-cjg-field-hint">书架根目录</span>
+      <input class="dsh-cjg-input" type="text" value="" placeholder="C:\Users\Administrator\.dsh\cangjingge">
+    </label>
+    <span class="dsh-cjg-field-hint">留空 = 用当前生效值（不覆盖）。目录不存在会自动创建。<br>保存后立即重扫，不需要重启。</span>
+    <div class="dsh-cjg-modal-actions">
+      <span class="dsh-cjg-spacer"></span>
+      <button class="dsh-cjg-btn">取消</button>
+      <button class="dsh-cjg-btn">恢复默认</button>
+      <button class="dsh-cjg-btn dsh-cjg-btn-primary">保存</button>
+    </div>
+  </div>
+</div></body></html>

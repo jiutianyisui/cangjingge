@@ -256,6 +256,14 @@ const skillC = join(root, '兵法', '谋', 'c.md')
   // 状态文件确实落盘（下划线开头，不会出现在书架里）
   const raw = JSON.parse(await readFile(join(root, '_visible.json'), 'utf8'))
   eq(raw.skills[skillA], true, '_visible.json 记录了该路径')
+
+  // 第四栏的数据源：shelf 要带回按书架顺序的已点亮清单（含定位信息）
+  const top = await callRoute('/cangjingge/shelf', '/cangjingge/shelf')
+  ok(Array.isArray(top.json.lit), 'shelf 回传 lit 数组（第四栏用）')
+  eq(top.json.lit.length, 1, 'lit 里只有刚点亮的那一个')
+  eq(top.json.lit[0].path, skillA, 'lit 项带 path')
+  eq(top.json.lit[0].group, '易经', 'lit 项带分组名（点击跳转用）')
+  eq(top.json.lit[0].item, '乾', 'lit 项带子项名（点击跳转用）')
 }
 
 {
