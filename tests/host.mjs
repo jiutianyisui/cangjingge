@@ -31,7 +31,10 @@ function eq(actual, expected, label) {
 
 // ---- 形状 ---------------------------------------------------------------------
 eq(host.name, 'dsh-cangjingge', '插件名与 patch id 一致')
-eq(host.inject, ['webServer', 'systemPrompt'], 'inject 含 webServer 与 systemPrompt')
+// inject 只能有 webServer：把 systemPrompt 写进来会让整个插件起不来 —— 它是
+// Agent scope 的服务（根 ctx 等不到）→ cordis 挂起 → apply() 不执行 → 所有
+// /cangjingge/* 路由 404（真实事故）。systemPrompt 走运行时 ctx.get，拿不到就降级。
+eq(host.inject, ['webServer'], 'inject 只有 webServer（systemPrompt 必须运行时取）')
 ok(host.Config !== undefined && host.Config['~standard'] !== undefined, 'Config 有 ~standard')
 eq(typeof host.Config['~standard'].validate, 'function', 'Config 可 validate')
 
@@ -65,11 +68,15 @@ function makeCtx() {
         return () => {}
       },
     },
-    systemPrompt: {
-      section(spec) {
-        sections.push(spec)
-        return () => {}
-      },
+    // systemPrompt 走 **运行时 ctx.get**（不是 inject 依赖）：见 host.js 的说明。
+    get(name) {
+      if (name !== 'systemPrompt') return undefined
+      return {
+        section(spec) {
+          sections.push(spec)
+          return () => {}
+        },
+      }
     },
   }
 }
@@ -356,6 +363,23 @@ const skillC = join(root, '兵法', '谋', 'c.md')
   eq(res.state.status, 403, '跨源来源被拒 403')
 }
 
+// ---- 降级：systemPrompt 不可用时插件必须照常启动 -------------------------------
+{
+  // 【关键回归】systemPrompt 拿不到时**不能**影响插件启动 ——
+  // 这正是把它写进 inject 时踩的坑（整个插件起不来、路由全 404）。
+  const r2 = []
+  const ctx2 = {
+    logger: { info() {}, warn() {} },
+    effect(fn) { fn(); return () => {} },
+    webServer: { register(spec) { r2.push(spec); return () => {} } },
+    get() { return undefined },
+  }
+  let threw = false
+  try { host.apply(ctx2, { libraryDir: root }) } catch { threw = true }
+  eq(threw, false, 'systemPrompt 不可用时 apply 不抛')
+  eq(r2.length, 7, 'systemPrompt 不可用时路由照常注册（降级而非阵亡）')
+}
+
 // ---- 自动注入（systemPrompt.section）------------------------------------------
 {
   // 装载时应当注册了一个 section
@@ -378,7 +402,7 @@ const skillC = join(root, '兵法', '谋', 'c.md')
     logger: { info() {}, warn() {} },
     effect(fn) { fn(); return () => {} },
     webServer: { register() { return () => {} } },
-    systemPrompt: { section(spec) { s2.push(spec); return () => {} } },
+    get(name) { return name === 'systemPrompt' ? { section(spec) { s2.push(spec); return () => {} } } : undefined },
   }
   host.apply(ctx2, { libraryDir: root })
   eq(s2.length, 1, '第二次装载也注册 section')
@@ -397,7 +421,7 @@ const skillC = join(root, '兵法', '谋', 'c.md')
     logger: { info() {}, warn() {} },
     effect(fn) { fn(); return () => {} },
     webServer: { register() { return () => {} } },
-    systemPrompt: { section(spec) { s3.push(spec); return () => {} } },
+    get(name) { return name === 'systemPrompt' ? { section(spec) { s3.push(spec); return () => {} } } : undefined },
   }
   host.apply(ctx3, { libraryDir: root })
   eq(s3[0].text(), '', '取消自动后注入文本为空串')

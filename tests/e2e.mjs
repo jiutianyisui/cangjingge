@@ -38,7 +38,8 @@ const ctx = {
   logger: { info() {}, warn() {} },
   effect(fn) { fn(); return () => {} },
   webServer: { register(spec) { routes.push(spec); return () => {} } },
-  systemPrompt: { section() { return () => {} } },
+  // systemPrompt 走运行时 ctx.get（不是 inject）——见 host.js 的说明
+  get(name) { return name === 'systemPrompt' ? { section() { return () => {} } } : undefined },
 }
 host.apply(ctx, { libraryDir: root })
 

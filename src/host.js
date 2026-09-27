@@ -56,15 +56,20 @@ export const name = 'dsh-cangjingge'
 /**
  * 依赖的服务。
  * - webServer：注册浏览器半读取书架用的 HTTP 路由。
- * - systemPrompt：「自动」skill 的常驻注入（动态 section）。
  *
- * 【必须声明 systemPrompt】cordis 是依赖注入框架：不声明依赖，apply 可能在
- * 服务就绪前跑完，那时 ctx.systemPrompt 是 undefined，注入静默失败。
- * （藏经阁踩过一次同类坑：客户端 inject 漏了 inputTriggers，`/` 菜单不出现。）
+ * 【systemPrompt 为什么**不**写在这里 —— 真实事故】
+ *   早先这里是 inject = ['webServer', 'systemPrompt']，结果**整个插件起不来**：
+ *   /cangjingge/* 的所有路由全 404，而同一 profile 里别的插件（如天枢）正常。
+ *   原因：systemPrompt 是 **Agent scope** 的服务（由 dsh-base 的 preset 层挂在
+ *   agent 作用域），根 ctx 永远等不到它 —— 声明成插件依赖 = cordis 无限期等待
+ *   = apply() 一次都没跑。
+ *
+ *   改成**运行时取**（ctx.get）后：拿得到就注册常驻注入，拿不到就只跳过注入
+ *   这一个功能，书架的 HTTP 路由照常工作。这是**功能降级而非整体阵亡**。
  *
  * 注意这里**没有** tools：藏经阁不注册模型工具。
  */
-export const inject = ['webServer', 'systemPrompt']
+export const inject = ['webServer']
 
 /** 默认藏经阁根目录（用户可在设置或 patch 里覆盖）。 */
 export function defaultLibraryDir() {
@@ -735,9 +740,25 @@ export function apply(ctx, config) {
   //
   // 【空文本】返回空串会被 renderPrompt 的 filter 掉，等于没有这一节。
   //   所以"取消全部自动"= 这一节自然消失，不需要注销注册。
-  ctx.effect(() => ctx.systemPrompt.section({
-    name: 'cangjingge:auto',
-    order: 700,
-    text: () => autoSectionText(),
-  }), 'dsh-cangjingge: auto sections')
+  //
+  // 【为什么用 ctx.get 而不是 inject 依赖 —— 真实事故，别改回去】
+  //   把 'systemPrompt' 写进 inject 会让**整个插件起不来**：它是 Agent scope
+  //   的服务，根 ctx 等不到 → cordis 无限期挂起 → apply() 一次都没跑 →
+  //   所有 /cangjingge/* 路由 404。现在改成运行时取：拿不到就只少这一个功能。
+  // -------------------------------------------------------------------------
+  try {
+    const systemPrompt = typeof ctx.get === 'function' ? ctx.get('systemPrompt') : undefined
+    if (systemPrompt !== undefined && systemPrompt !== null && typeof systemPrompt.section === 'function') {
+      ctx.effect(() => systemPrompt.section({
+        name: 'cangjingge:auto',
+        order: 700,
+        text: () => autoSectionText(),
+      }), 'dsh-cangjingge: auto sections')
+    } else {
+      // 降级而不是报错：书架与 `/` 插入都不受影响，只是"自动"不生效
+      ctx.logger?.warn?.('dsh-cangjingge: systemPrompt 不可用，自动注入已跳过（书架与 / 插入仍可用）')
+    }
+  } catch (error) {
+    ctx.logger?.warn?.('dsh-cangjingge: 注册自动注入失败（已跳过）：' + String(error && error.message ? error.message : error))
+  }
 }
